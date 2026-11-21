@@ -188,24 +188,58 @@ def ask(data_dir, topic: str) -> str:
 
 def brief(data_dir, meeting: int | None = None) -> tuple[str, str]:
     """Stage 3: the open actions (and the decisions they serve) as a brief for Main Kairu's split (team.split). Returns
-    (name, brief). meeting None: every meeting's open actions. Raises ValueError with what to tell you.
+    (name, brief). meeting None: every meeting's open actions. Raises ValueError with what to tell you."""
+    name, text, _ = brief_and_rest(data_dir, meeting)
+    return name, text
+
+
+def brief_and_rest(data_dir, meeting: int | None = None) -> tuple[str, str, int]:
+    """The brief, and how many open actions did not fit in it (they go in the next split).
 
     Stage 5: each line starts with its id ([A2.3] an action, [D2.1] a decision), so team.split can link every Clone task
-    back to the item it does (kairu/meeting/proof.py). An item whose Clone work is already done is left out."""
+    back to the item it does (kairu/meeting/proof.py). An item whose Clone work is done, or that is already split to a
+    project that wasn't stopped, is left out. The brief goes through the brain's privacy filter (kairu/brain/privacy.py) as
+    a public order, so it is built to pass it, never by loosening it: as many actions as fit (a longer text counts as maybe
+    pasted, so personal), then the decisions they serve, as room allows. What doesn't fit waits for the next split."""
     if not exists(data_dir):
         raise ValueError("No meetings yet: read one first.")
+    from kairu.brain import privacy
     from kairu.meeting import proof
     ledger = [item for item in proof.ledger(data_dir) if item["status"] == "open" and (meeting is None or item["meeting"] == meeting)]
-    actions = [item for item in ledger if item["kind"] == "action"]
+    split = proof.split_already(data_dir)
+    every = [item for item in ledger if item["kind"] == "action"]
+    actions = [item for item in every if (item["meeting"], item["number"]) not in split]
     if not actions:
+        if every:
+            raise ValueError("Every open action is already split to the Clones: start it with `kairu team start` (or say "
+                             "\"start the project\"), and watch it on the Clones page.")
         raise ValueError("There are no open actions to split.")
     decisions = [item for item in ledger if item["kind"] == "decision"]
     title = ledger[-1]["meeting_title"] if meeting else "the meetings"
-    parts = [f"Work agreed in {title}."]
-    if decisions:
-        parts.append("Decided: " + "; ".join(f"[D{item['meeting']}.{item['number']}] {item['what']}"
-                                             for item in decisions[-6:]) + ".")
-    parts.append("Tasks: " + "; ".join(
-        f"[A{item['meeting']}.{item['number']}] {item['what']}" + (f" (owner {item['owner']})" if item["owner"] else "")
-        + (f" (due {item['due']})" if item["due"] else "") for item in actions[:12]) + ".")
-    return (f"From {title}"[:60], " ".join(parts)[:1900])
+
+    def text(acts: list[dict], decs: list[dict]) -> str:
+        parts = [f"Work agreed in {title}."]
+        if decs:
+            parts.append("Decided: " + "; ".join(f"[D{item['meeting']}.{item['number']}] {item['what']}" for item in decs) + ".")
+        parts.append("Tasks: " + "; ".join(
+            f"[A{item['meeting']}.{item['number']}] {item['what']}" + (f" (owner {item['owner']})" if item["owner"] else "")
+            + (f" (due {item['due']})" if item["due"] else "") for item in acts) + ".")
+        return " ".join(parts)
+
+    def passes(candidate: str) -> bool:
+        verdict = privacy.classify(candidate)
+        return not verdict.secret and not verdict.personal
+
+    chosen = []
+    for item in actions[:12]:
+        if passes(text(chosen + [item], [])):
+            chosen.append(item)
+    if not chosen:
+        verdict = privacy.classify(text(actions[:1], []))
+        raise ValueError(f"The first open action can't go to the cloud AI to be split: it has {verdict.why()}. Change its "
+                         "words, or give the work to a Clone yourself.")
+    kept = []
+    for item in reversed(decisions[-6:]):
+        if passes(text(chosen, [item] + kept)):
+            kept.insert(0, item)
+    return f"From {title}"[:60], text(chosen, kept), len(actions) - len(chosen)

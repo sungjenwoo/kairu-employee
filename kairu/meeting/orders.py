@@ -158,7 +158,7 @@ def _split(core, meeting: int | None, hours: float) -> str:
         return (f"First decide the {len(found['between'])} conflict{'s' if len(found['between']) != 1 else ''} between "
                 "meetings (say: show the conflicts), then split the meeting.")
     try:
-        name, brief = ledger.brief(core.cfg.data_dir, meeting)
+        name, brief, rest = ledger.brief_and_rest(core.cfg.data_dir, meeting)
     except ValueError as problem:
         return str(problem)
     core._tell({"kind": "thinking"})
@@ -169,4 +169,8 @@ def _split(core, meeting: int | None, hours: float) -> str:
     if outcome != "finished":
         return _ended("The split", outcome)
     answer = BrainStore(core.cfg.data_dir).take_answer(ask)
-    return answer.text if answer else "No split came back; Guardian's log says why."
+    if not answer:
+        return "No split came back; Guardian's log says why."
+    more = (f"\n{rest} more open action{'s' if rest != 1 else ''} didn't fit in one brief: say \"split the meeting\" again "
+            "for them." if rest and answer.status == "answered" else "")
+    return answer.text + more

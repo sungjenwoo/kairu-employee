@@ -109,8 +109,20 @@ def test_the_split_may_name_the_item_and_a_bad_id_is_only_left_out():
 
 
 def test_only_a_meetings_split_is_told_to_name_the_item():
-    assert '"from"' in split.instructions([{"name": "Ravi", "share": 1.0}], 60, ids=True)
-    assert '"from"' not in split.instructions([{"name": "Ravi", "share": 1.0}], 60)
+    assert "from field" in split.instructions([{"name": "Ravi", "share": 1.0}], 60, ids=True)
+    assert "from field" not in split.instructions([{"name": "Ravi", "share": 1.0}], 60)
+
+
+def test_the_backstop_lets_a_meetings_split_leave(tmp_path):
+    """Found on the laptop, 21 Nov 2026: a quoted id ("A2.3") beside the rules' word "password" read as a password.
+    The whole request, instructions and brief, must pass the backstop unchanged."""
+    from kairu.brain import privacy
+    laptop_meetings(tmp_path)
+    _, brief = ledger.brief(tmp_path)
+    for team_size in ([{"name": "Me", "share": 1.0}], [{"name": "Ravi", "share": 1.0, "skills": "design, writing"},
+                                                       {"name": "Anu", "share": 2.0}]):
+        leaving = split.instructions(team_size, 120, {"Me": 30}, ids=True) + "\n" + f"Order: {brief}"
+        assert privacy.secrets_in(leaving) == [], privacy.secrets_in(leaving)
 
 
 def test_tasks_are_linked_by_the_named_id_by_their_words_and_with_their_decision(tmp_path):
@@ -150,16 +162,20 @@ def test_team_split_links_a_meetings_tasks_and_says_so(tmp_path, monkeypatch):
         def __init__(self, data_dir, brain=None):
             pass
 
-        def plan(self, brief, source, instructions, longest=0):
+        def plan(self, brief, source, instructions, longest=0, tokens=None):
             told["instructions"] = instructions
+            told["room"] = (longest, tokens)
             return gateways.Result(gateways.ANSWERED, "L3", json.dumps({"tasks": split_tasks(number)}), "gemini")
     monkeypatch.setattr(gateways, "Gateway", Brain)
     name, brief = ledger.brief(tmp_path, number)
     team.split(str(tmp_path), brief, name, 0, "a" * 16, "pc")
     said = BrainStore(tmp_path).take_answer("a" * 16).text
-    assert '"from"' in told["instructions"]
+    assert "from field" in told["instructions"]
+    from kairu.brain import privacy
+    assert privacy.secrets_in(told["instructions"] + brief) == []  # the backstop would let it leave
     assert f"Linked to the meeting: task 1 → A{number}.2, task 2 → A{number}.3" in said
     assert len(MeetingStore(tmp_path).links()) >= 2
+    assert told["room"] == (team.SPLIT_ANSWER, team.SPLIT_TOKENS)  # a long split is never cut off
 
 
 # --- written back when the Clones finish -----------------------------------------------------------------------------
@@ -237,7 +253,7 @@ def test_work_done_in_one_split_counts_even_after_a_resplit(tmp_path):
     store, number = site_meeting(tmp_path)
     team_store, project, runner, fakes = run_project(tmp_path, number)
     again = team_store.add_project("Again", "brief", None, split_tasks(number))
-    _, brief = ledger.brief(tmp_path, number)
+    brief = f"Decided: [D{number}.1] The homepage. Tasks: [A{number}.2] Write the homepage copy.; [A{number}.3] Research."
     proof.link_project(tmp_path, again, split_tasks(number), brief)
     team_store.set_task(project, 1, state=DONE, step=2, finished=2000.0)
     assert proof.sync(tmp_path) == [(number, 1), (number, 2)]
@@ -247,6 +263,7 @@ def test_a_done_item_is_left_out_of_the_next_split_and_of_the_rule_checks(tmp_pa
     _, number = site_meeting(tmp_path)
     team_store, project, runner, fakes = run_project(tmp_path, number)
     team_store.set_task(project, 1, state=DONE, step=2, finished=2000.0)  # not yet written back: the overlay sees it
+    team_store.set_project(project, state="stopped")  # so the research, split but stopped, may be split again
     _, brief = ledger.brief(tmp_path, number)
     assert "homepage copy" not in brief.lower() and "Research bakery websites" in brief
 
@@ -346,3 +363,100 @@ def test_the_brief_runs_through_guardian_with_no_card(program_with_pin):
     assert said.startswith("Before your next meeting: 0 done, 2 open"), said
     assert "Write the homepage copy (Ravi, " in said and "not split to the Clones yet" in said
     assert owner.cards == []  # Low and read only: no card, no PIN
+
+
+# --- the brief passes the privacy filter (found on the laptop, 21 Nov 2026: a 900-letter brief counted as "maybe pasted") --
+
+LAPTOP_ONE = {"title": "Fresh Bakes kickoff", "summary": "", "people": [], "items": [
+    {"kind": "decision", "what": "Drop the mobile app for now.", "status": "replaced"},
+    {"kind": "decision", "what": "Use a warm brown and cream colour palette matching the shop."},
+    {"kind": "decision", "what": "Launch on the 28th of November."},
+    {"kind": "action", "what": "Own the homepage design and create the first mockup.", "owner": "Priya", "due": "2026-11-16"},
+    {"kind": "action", "what": "Build the menu and ordering page.", "owner": "Ravi", "due": "2026-11-20"},
+    {"kind": "action", "what": "Write the copy for all pages.", "owner": "Anu", "due": "2026-11-18"},
+    {"kind": "action", "what": "Ask the client whether they want online payments or just pickup orders.", "owner": "Saitej"}]}
+LAPTOP_TWO = {"title": "Fresh Bakes weekly sync", "summary": "", "people": [], "items": [
+    {"kind": "decision", "what": "Add the mobile app back to the project scope."},
+    {"kind": "decision", "what": "Launch the website earlier on the 25th of November."},
+    {"kind": "decision", "what": "Use online payments with Razorpay."},
+    {"kind": "action", "what": "Build the mobile app.", "owner": "Ravi", "due": "2026-11-28", "status": "dropped"},
+    {"kind": "action", "what": "Own the payment page design.", "owner": "Priya", "due": "2026-11-24"},
+    {"kind": "action", "what": "Set up hosting and the domain.", "owner": "Anu", "due": "2026-11-21"}]}
+
+
+def laptop_meetings(tmp_path):
+    store = MeetingStore(tmp_path)
+    numbers = []
+    for held, reading in (("2026-11-12", LAPTOP_ONE), ("2026-11-19", LAPTOP_TWO)):
+        items = [dict({"owner": "", "due": "", "quote": "", "heard": False, "owner_heard": bool(item.get("owner"))}, **item)
+                 for item in reading["items"]]
+        number = store.add(reading["title"], held, f"{held}.vtt", held * 6, "transcript", ["[00:01] A: hi"],
+                           dict(reading, items=items))
+        for index, item in enumerate(items, 1):
+            if item.get("status"):
+                store.set_status(number, index, item["status"])
+        numbers.append(number)
+    return store, numbers
+
+
+def test_the_laptops_six_actions_go_in_a_brief_the_privacy_filter_lets_through(tmp_path):
+    from kairu.brain import privacy
+    laptop_meetings(tmp_path)
+    name, brief, rest = ledger.brief_and_rest(tmp_path)
+    verdict = privacy.classify(brief)
+    assert not verdict.secret and not verdict.personal, verdict.why()
+    assert len(brief) <= privacy.LONGEST
+    assert rest == 0 and len([key for key in proof.ids_in(brief) if key.startswith("A")]) == 6
+    assert "[A1.4] Own the homepage design and create the first mockup. (owner Priya) (due 2026-11-16)" in brief
+
+
+def test_more_actions_than_fit_wait_for_the_next_split_and_a_split_one_is_not_split_again(tmp_path):
+    from kairu.brain import privacy
+    store = MeetingStore(tmp_path)
+    many = {"title": "Big", "summary": "", "people": [], "items": [
+        {"kind": "action", "what": f"Write the long description of bakery product number {n} for the website catalogue.",
+         "owner": "Anu", "due": "2026-11-30", "quote": "", "heard": False, "owner_heard": True} for n in range(1, 13)]}
+    number = store.add("Big", "2026-11-19", "big.vtt", "e" * 64, "transcript", ["[00:01] A: hi"], many)
+    _, first, rest = ledger.brief_and_rest(tmp_path)
+    assert 0 < rest < 12 and not privacy.classify(first).personal
+    team_store = clones(tmp_path)
+    tasks = [task(f"Product {n}", "Anu") for n in range(1, 13 - rest)]
+    project = team_store.add_project("Big 1", first, None, tasks)
+    for index, key in enumerate(sorted(proof.ids_in(first), key=lambda k: int(k.split(".")[1])), 1):
+        store.link(project, index, number, int(key.split(".")[1]), "named")
+    _, second, left = ledger.brief_and_rest(tmp_path)
+    assert not set(proof.ids_in(first)) & set(proof.ids_in(second))  # the next split takes only the rest
+    team_store.set_project(project, state="stopped")
+    assert set(proof.ids_in(first)) <= set(proof.ids_in(ledger.brief_and_rest(tmp_path)[1])) | set(proof.ids_in(second))
+
+
+def test_when_every_open_action_is_split_the_split_says_start_it(tmp_path):
+    _, number = site_meeting(tmp_path)
+    run_project(tmp_path, number)
+    with pytest.raises(ValueError, match="already split"):
+        ledger.brief(tmp_path)
+
+
+def test_a_long_split_answer_comes_back_whole_from_the_gateway(tmp_path, monkeypatch):
+    """Eight tasks of four orders each, through the real Gateway with a stand-in provider: the max_tokens asked for is the
+    split's, and the JSON comes back whole, so the split reads it (the laptop got "not JSON" from a cut-off answer)."""
+    from kairu.brain import gateway as gateways, keys
+    from kairu.brain.providers import Reply
+    asked = {}
+    tasks = [task(f"Task number {n} of the bakery website", "Ravi",
+                  [f"make a file called part{n}.txt saying Section {n} of the bakery site with fresh bread"] * 4,
+                  done=f"part{n}.txt exists with section {n}") | {"from": "A1.4"} for n in range(1, 9)]
+    whole = json.dumps({"tasks": tasks}, indent=2)
+    assert len(whole) > 4000  # longer than the old 4000-letter cut
+
+    def fake_chat(provider, key, messages, account="", model=None, transport=None, max_tokens=700, timeout=0):
+        asked["max_tokens"] = max_tokens
+        return Reply(whole, 10, 10, None, None, None)
+    monkeypatch.setattr(gateways, "chat", fake_chat)
+    keys.save(tmp_path, "groq", "gsk_" + "x" * 52)
+    result = gateways.Gateway(tmp_path, {"public_to_cloud": True, "providers": ["groq"]}).plan(
+        "Work agreed in the meetings. Tasks: [A1.4] Build the site.", "pc", "Split it.", longest=team.SPLIT_ANSWER,
+        tokens=team.SPLIT_TOKENS)
+    assert result.status == gateways.ANSWERED, result.text
+    assert asked["max_tokens"] == team.SPLIT_TOKENS
+    assert len(split.parse(result.text, [{"name": "Ravi", "share": 1.0}])) == 8

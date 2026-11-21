@@ -198,7 +198,7 @@ def meeting(args, cfg) -> int:
             print("Decide the conflicts between meetings first, then split.")
             return 1
         try:
-            name, brief = ledger.brief(cfg.data_dir, args.number)
+            name, brief, rest = ledger.brief_and_rest(cfg.data_dir, args.number)
         except ValueError as problem:
             print(problem)
             return 1
@@ -212,6 +212,9 @@ def meeting(args, cfg) -> int:
         answer = BrainStore(cfg.data_dir).take_answer(ask)
         print(answer.text if answer else problem or "No split came back; Guardian's log says why.")
         if answer and answer.status == "answered":
+            if rest:
+                print(f"{rest} more open action{'s' if rest != 1 else ''} didn't fit in one brief: run `kairu meeting split` "
+                      "again for them.")
             print("Start it with `kairu team start`, and watch it on the Clones page (kairu workspace).")
         return 0 if answer and answer.status == "answered" else 1
     return 2

@@ -49,8 +49,11 @@ def _who(clone: dict, busy: dict) -> str:
 
 
 FROM = re.compile(r"[AD]\d{1,6}\.\d{1,3}")  # a meeting item's id, as a meeting's brief carries it ([A2.3])
-FROM_LINE = (" The brief comes from a meeting: each of its lines starts with an id in brackets, such as [A2.3]. Add "
-             '"from": "A2.3" to each task, naming the line of the brief the task does (an A id when there is one).')
+# The id is never written in quotes here: the backstop (kairu/brain/privacy.py) reads a quoted word like a code next to the
+# word "password" (the rules above) as a password being sent, and stops everything (found on the laptop, 21 Nov 2026)
+FROM_LINE = (" The brief comes from a meeting: each of its lines starts with an id in brackets, such as [A2.3]. Give each "
+             "task a from field holding the id of the line of the brief it does, without the brackets, such as A2.3 (an A id "
+             "when there is one).")
 
 
 def instructions(clones: list[dict], minutes: float | None, busy: dict | None = None, ids: bool = False) -> str:

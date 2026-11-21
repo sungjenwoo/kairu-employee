@@ -266,7 +266,7 @@ class Gateway:
 
     # --- a plan (Sprint Day 4) ------------------------------------------------------------------------
 
-    def plan(self, order: str, source: str, instructions: str, longest: int = LONGEST_ANSWER) -> Result:
+    def plan(self, order: str, source: str, instructions: str, longest: int = LONGEST_ANSWER, tokens: int | None = None) -> Result:
         """Steps of Kairu's own skills for an order the rules don't know, as the AI writes them (kairu/tasks/plan.py).
 
         The same privacy filter first: a secret is never sent; an order with personal words is not sent to be planned (there
@@ -288,7 +288,7 @@ class Gateway:
             return Result(NOT_SENT, "L3", "I didn't send it to be planned: brain.public_to_cloud is false. Say it as separate "
                                           "orders.")
         messages = [{"role": "system", "content": instructions}, {"role": "user", "content": f"Order: {order}"}]
-        result = self._send(messages, self.order, "", started, longest=longest)
+        result = self._send(messages, self.order, "", started, longest=longest, tokens=tokens)
         return Result(result.status, "L3", result.text, result.provider, result.note, (), result.seconds)
 
     # --- the Builder (BUILDER.md, ADR-050 proposed) ---------------------------------------------------------

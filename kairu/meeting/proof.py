@@ -160,6 +160,20 @@ def progress(data_dir) -> dict:
     return out
 
 
+def split_already(data_dir) -> set[tuple[int, int]]:
+    """The meeting items already linked to a Clone project that wasn't stopped (so the next split leaves them out)."""
+    if not exists(data_dir):
+        return set()
+    links = MeetingStore(data_dir).links()
+    from kairu.team.store import TeamStore, exists as team_exists
+    if not links or not team_exists(data_dir):
+        return set()
+    team = TeamStore(data_dir)
+    live = {number for number in {link["project"] for link in links}
+            if (team.project(number) or {}).get("state", "stopped") != "stopped"}
+    return {(link["meeting"], link["item"]) for link in links if link["project"] in live}
+
+
 def overlay(items: list[dict], work: dict) -> list[dict]:
     """The items with their Clone work laid over them: "work" on every linked item, and an open item whose work is complete
     shown as done with its proof. Read only: sync() is what writes it back."""

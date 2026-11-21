@@ -42,6 +42,11 @@ SAY = "[Ksay]"  # what a Clone's person said with `kairu team say`: data for the
 ANSWER = re.compile(r"\[Kanswer\] (\d{1,6}) (yes|no)")  # a Clone's person's answer to an offer made to that Clone
 NOTE_ROOM = 600
 
+# A split of up to 8 tasks of up to 4 orders is long JSON: room enough that it is never cut off (found on the laptop,
+# 21 Nov 2026: six tasks went past the 700 tokens a plan gets by default, and the answer was "not JSON")
+SPLIT_ANSWER = 16_000   # characters kept
+SPLIT_TOKENS = 4_000    # the most the AI may write (Gemini, OpenRouter and Cloudflare take their own cap if lower)
+
 POLL_SECONDS = 3.0
 MOST_HOURS = 12  # a run ends by itself after this; start it again to go on
 QUIET_SECONDS = 600  # a Clone not heard from this long shows as "not heard from" on the board
@@ -204,7 +209,7 @@ def split(data_dir: str, brief: str, name: str, deadline: float, ask: str, sourc
     from kairu.meeting.proof import ID
     from_meeting = bool(ID.search(brief or ""))  # a meeting's brief (HACKATHON.md stage 5): each task names its item
     result = Gateway(data_dir, brain).plan(brief, source, instructions(clones, minutes, busy_minutes(store), from_meeting),
-                                           longest=4000)
+                                           longest=SPLIT_ANSWER, tokens=SPLIT_TOKENS)
     if result.status != ANSWERED:
         return _keep(data_dir, ask, source, result)
     try:
