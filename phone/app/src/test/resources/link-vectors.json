@@ -1,0 +1,23 @@
+{
+ "phone_sign_seed": "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=",
+ "phone_box_private": "ISIjJCUmJygpKissLS4vMDEyMzQ1Njc4OTo7PD0+P0A=",
+ "pc_sign_seed": "QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVpbXF1eX2A=",
+ "pc_box_private": "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXp7fH1+f4A=",
+ "phone_sign_public": "ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=",
+ "phone_box_public": "WGmv9FBUlzLLqu1eXfmzCm2jHLDldCutWtShp2jxpns=",
+ "pc_sign_public": "rcFAEfgtHFbZVqpPnXPYhYNhpgYEhSXg0Ixjjcdd2Mc=",
+ "pc_box_public": "JE/juWPomd0pW6/84kjTUw86mnR5ugYwAmgOv+etrUk=",
+ "nonce": "yMnKy8zNzs/Q0dLT1NXW19jZ2tvc3d7f",
+ "message": "aGVsbG8gS2FpcnUg4pyT",
+ "box_phone_to_pc": "yMnKy8zNzs/Q0dLT1NXW19jZ2tvc3d7fqxyQjoVTMKOXb4Qc/Fh1Hg1aO0JfYYdgsXLT8g36vg==",
+ "phone_signature": "rK7dgVTYG3giesv5HOc+s4h4K+hKIyXkLj0CCynM74UifbkGNwmD/7J1/GoQFiFR3eRdK+zf5ZiI2BztRFw0DQ==",
+ "phone_id": "dev-65b60673d6ed884b",
+ "pc_id": "pc-ba8112fa4ba3d6f9",
+ "pc_envelope": "{\"v\":1,\"from\":\"pc-ba8112fa4ba3d6f9\",\"to\":\"dev-65b60673d6ed884b\",\"box\":\"3jThf3XRVw2F0km5H6DI0XyWJNQ0lq8AADAo+LNalR7FPoje0BuL4qUG4Og0gAr9+b9nBNTdzVaQTQTGM/Exl7pR950hADcH3gtPdsH8m4fK2D8I0RPxn4I4eTwj0GfFXQrE4eDynOxnYgUgsa3gmIXy1qVbj8w2S3Yeb3qytBMmcPXLchLOXkhXu6MDLULXjNFgawL63XSsA+HJ/cQdA9f+1Cic5P5EEDL6cV0rgnzzyE0PNKmDrZbDgEmrkv2wIh4Oq53gQ1CnpXDEvK+mqIfR4D50MTp9MiaqjnQCZSHn9/WvIRoh0hXuX1jJFa+D5rfFzXWyG2fvLo0nseu+hNiVTL3is3JKc7zHxbqXFbmblfgZHCA=\"}",
+ "pc_envelope_now_ms": 1762850000000,
+ "proof_code": "123456",
+ "proof_nonce": "abababababababababababababababab",
+ "proof": "83bb511c83aceba4f477fbabb86617a6a5217ce261ae0ad2467bd6e614987eb9",
+ "offer": "kairu-pair:1:eyJwYyI6InBjLWJhODExMmZhNGJhM2Q2ZjkiLCJzaWduIjoicmNGQUVmZ3RIRmJaVnFwUG5YUFloWU5ocGdZRWhTWGcwSXhqamNkZDJNYz0iLCJib3giOiJKRS9qdVdQb21kMHBXNi84NGtqVFV3ODZtblI1dWdZd0FtZ092K2V0clVrPSIsInRvcGljIjoiY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2MiLCJyZWxheSI6Imh0dHBzOi8vbnRmeS5zaCIsImV4cGlyZXMiOjE3NjI4NTA2MDB9",
+ "approve_statement": "kairu-approve-v1|dev-65b60673d6ed884b|7|ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff|1762850600"
+}

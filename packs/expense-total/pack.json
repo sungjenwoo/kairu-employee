@@ -1,0 +1,9 @@
+{
+  "pack": 1,
+  "name": "expense-total",
+  "title": "Add up the expenses I say",
+  "description": "Add up the expenses I say",
+  "version": "0.1",
+  "entry": "skill.py",
+  "made_by": "Shruthi"
+}

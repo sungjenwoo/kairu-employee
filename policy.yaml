@@ -1,0 +1,566 @@
+# Kairu Guardian policy.
+#
+# Every action Kairu may take is listed here with its risk tier (Architecture 10.3, decision D4):
+#   Low       allowed
+#   Medium    allowed
+#   High      needs your approval: you type "yes" and your PIN in the terminal, once per action
+#   Critical  always refused; there is no approval, PIN or setting that unlocks it
+#
+# An action that is not listed is refused.
+# read_only: true means the action changes nothing, so it still runs in Safe Mode. Leave it out and
+#   the action is treated as a change, which Safe Mode refuses.
+# feature: voice or research ties the action to a switch in config.yaml; while the switch is off,
+#   the action is refused.
+# private: true means the action's details are your own words (a question, a mission card, a search), so
+#   Guardian's audit log keeps only their hash. It changes no decision.
+#
+# Guardian reads this file once, at start. Nothing in Kairu can change it while it runs; edit it,
+# review the change, and restart.
+
+version: 1
+
+actions:
+  # Low
+  chat.reply:
+    tier: Low
+    read_only: true
+    description: Answer you in the chat
+  status.show:
+    tier: Low
+    read_only: true
+    description: Show Kairu's status
+  files.read:
+    tier: Low
+    read_only: true
+    description: Read a file in the folder you approved
+  files.summarize:
+    tier: Low
+    read_only: true
+    description: Summarize a file in the folder you approved
+  demo.count:
+    tier: Low
+    description: A harmless practice task that counts seconds, for trying the emergency stop (kairu demo)
+  voice.listen:
+    tier: Low
+    read_only: true
+    feature: voice
+    private: true
+    description: Turn your speech into text on this PC, with the small offline model; only after you switch the mic on in the Kairu bar
+  live.talk:
+    tier: Medium
+    feature: voice
+    private: true
+    description: Talk with Kairu Live (LiveKit), only after you switch the mic on in the Kairu bar with voice.live on in config.yaml; what you say goes to Deepgram, Google Gemini and ElevenLabs, and every order it hears goes to the task core and Guardian like a typed one
+  voice.speak:
+    tier: Low
+    read_only: true
+    feature: voice
+    private: true
+    description: Read an answer aloud on this PC, in Windows' own voice
+
+  # Low: Guardian protection (Phase J). The monitors see and report; they cannot act or approve.
+  protect.watch:
+    tier: Low
+    read_only: true
+    description: Run Guardian's monitors, which watch the sources you connected (read-only) and raise alerts
+  protect.pause:
+    tier: Low
+    description: Pause watching one source, or all, within what you already approved
+  protect.resume:
+    tier: Low
+    description: Watch a paused source again, within what you already approved
+  protect.disconnect_email:
+    tier: Low
+    description: Remove Kairu's access to your Gmail and delete its key on this PC
+  protect.remove_folder:
+    tier: Low
+    description: Stop watching a folder
+  alerts.dismiss:
+    tier: Low
+    description: Mark an alert done, or a false alarm (kept as your report; it never changes a rule)
+  deadline.add:
+    tier: Low
+    description: Add a deadline to your own list, for reminders
+  deadline.remove:
+    tier: Low
+    description: Take a deadline off your list, so no more reminders come
+
+  # Low: Kairu Link (Phase C, LINK.md). A message from your phone is only a request: Guardian decides
+  # each one by this policy, High still needs "yes" and your PIN at this PC, Critical is still refused.
+  link.receive:
+    tier: Low
+    description: Receive Kairu Link messages from your paired devices through the Gate (each one is only a request)
+  link.send:
+    tier: Low
+    private: true
+    description: Send a signed, encrypted Kairu Link message to one of your paired devices through the Gate
+  device.remove:
+    tier: Low
+    description: Unpair a device, so every message from it is refused
+
+  # Low: Shadows (Phase H, SHADOW.md). A Shadow on a friend's laptop holds no authority: what it says is data, never a
+  # request. These only read its reports, call it back, or take something away.
+  shadow.sync:
+    tier: Low
+    description: Read what your Shadows said through the Gate (progress, or the report of one that came home)
+  shadow.recall:
+    tier: Low
+    description: Tell a Shadow to come back now; with give_up, stop waiting for it and revoke its key on this PC
+  shadow.lesson:
+    tier: Low
+    description: Keep or drop one lesson a Shadow brought home (a lesson is words for you; it never changes a rule)
+  pack.remove:
+    tier: Low
+    description: Remove an installed skill pack from this PC
+
+  # Low: Kairu's brain (Phase B, BRAIN.md). The brain only thinks and answers; it never runs an action.
+  brain.ask:
+    tier: Low
+    private: true
+    description: Ask Kairu a question. Fixed rules answer on this PC; a question with no personal data goes to a free cloud AI that does not train on prompts; one with personal data waits for your approval; secrets are never sent
+  # Kairu's memory (stage M1, MEMORY.md): lines you told Kairu to remember, in data/memory.db on this PC only
+  memory.remember:
+    tier: Low
+    private: true
+    description: Keep a line you told Kairu to remember, on this PC only; a line with a secret is never kept
+  memory.forget:
+    tier: Medium
+    private: true
+    description: Delete lines from Kairu's memory on this PC (the ones about some words, or all of them); it cannot be undone
+  provider.remove:
+    tier: Low
+    description: Delete a free AI provider's key from this PC
+  provider.pause:
+    tier: Low
+    description: Leave one free AI provider alone for some minutes, as if at its free limit (0 minutes uses it again)
+  mission.create:
+    tier: Low
+    private: true
+    description: Save a new Mission Card (in Phase B its steps ask Kairu's brain or count seconds)
+  mission.run:
+    tier: Low
+    description: Work through the Mission Cards step by step, with a checkpoint after every step; Guardian decides each step
+  mission.stop:
+    tier: Low
+    description: Stop one mission; its card keeps its last checkpoint
+  mission.continue:
+    tier: Low
+    description: Go on with a stopped, waiting or failed mission from its last checkpoint
+  mission.remove:
+    tier: Low
+    description: Delete a Mission Card that is not running
+
+  # Low: the Kairu bar's skills (Sprint Day 1, BAR.md). Your orders are your own words, so all of these keep only a hash.
+  apps.list_open:
+    tier: Low
+    read_only: true
+    private: true
+    description: Say which apps have windows open on this PC, with their titles
+  apps.open:
+    tier: Low
+    private: true
+    description: Open an app by name, only one found in your Start Menu shortcuts or App Paths; never a typed path or command line
+  apps.arrange:
+    tier: Low
+    private: true
+    description: Put an app's window on the left or right half, maximize it, minimize it or bring it to the front
+  system.volume:
+    tier: Low
+    private: true
+    description: Set the sound volume, or mute it
+  system.brightness:
+    tier: Low
+    private: true
+    description: Set the brightness of the built-in screen
+  system.status:
+    tier: Low
+    read_only: true
+    private: true
+    description: Say the free memory, the battery, the processor's load and what uses the most memory
+  system.lock:
+    tier: Low
+    private: true
+    description: Lock this PC
+
+  # Low: files, waiting and plans (Sprint Day 4, BAR.md)
+  files.show:
+    tier: Low
+    private: true
+    description: Show a file or folder of your work folder in Explorer, selected; it reads and changes nothing
+  files.find:
+    tier: Low
+    read_only: true
+    private: true
+    description: Find files in your work folder (tasks.work_folder) by name and date only; it never opens them
+  details.show:
+    tier: Low
+    read_only: true
+    private: true
+    description: Show your saved details in the Kairu bar, at this PC only; never said aloud or sent
+  task.wait:
+    tier: Low
+    read_only: true
+    private: true
+    description: Wait some seconds (1 to 60) between the steps of a task
+  task.plan:
+    tier: Low
+    private: true
+    description: Keep a free-form plan you approved, before its first step runs - its steps, and whether you said yes or yes and your PIN (only a hash here; data/tasks.db keeps the record)
+  screen.read:
+    tier: Low
+    read_only: true
+    private: true
+    description: Read the names of the buttons, links and boxes in an app's window (not Kairu's own, not security or money apps); shown to you, never an order
+  # Low: PC4, the rest (BAR.md "Reading any window, numbers and the safe list"). Read-only: what they find is data, shown to
+  # you, never an order and never sent; a picture of a window (OCR, the backup) stays in memory on this PC
+  screen.read_text:
+    tier: Low
+    read_only: true
+    private: true
+    description: Read the words a window shows (its document, boxes, lists; a browser's page), or, if Windows gives none, a picture of that one window read by Windows' own OCR and kept in memory on this PC; not Kairu's own, security, password or money windows, never a password box; shown to you, never an order, sent nowhere
+  screen.numbers:
+    tier: Low
+    read_only: true
+    private: true
+    description: Show what you can click in a window, numbered, so you can say "click 3" (the names are kept for 5 minutes in Guardian's data folder, only for that)
+  hands.safe_list:
+    tier: Low
+    read_only: true
+    description: Say which apps are on the safe list of Kairu's hands (built in, and the ones you marked)
+  web.read_page:
+    tier: Low
+    read_only: true
+    private: true
+    description: Read the words of the web page in the browser in front (not Kairu's own windows, not a bank or payment page); shown to you, never an order, sent nowhere
+  brain.plan:
+    tier: Low
+    private: true
+    description: Ask the free cloud AI to turn an order the rules don't know into steps of Kairu's own skills (a public order only; personal ones are not sent); every step is shown to you and decided by Guardian
+
+  # Medium
+  files.write:
+    tier: Medium
+    private: true
+    description: Make a NEW text file in your work folder (tasks.work_folder) with the words you gave; it overwrites nothing, and undo puts it in the Recycle Bin
+  files.open:
+    tier: Medium
+    private: true
+    description: Open a file in your work folder with its own app, or a folder in Explorer; never a program, script or shortcut
+  settings.change:
+    tier: Medium
+    description: Change one of Kairu's own settings
+  research.web_search:
+    tier: Medium
+    feature: research
+    private: true
+    description: Send a search query to a web search engine (the query leaves this PC)
+  research.weather:
+    tier: Medium
+    feature: research
+    private: true
+    description: Look up the weather for a place at Open-Meteo (only the place name leaves this PC)
+  research.location:
+    tier: Medium
+    feature: research
+    private: true
+    description: Find this PC's area and city with Windows location (only a position rounded to about 1 km goes to OpenStreetMap)
+  research.web_read:
+    tier: Medium
+    feature: research
+    private: true
+    description: Read a web page's text; the address leaves this PC
+  files.rename:
+    tier: Medium
+    private: true
+    description: Rename a file inside your work folder (tasks.work_folder); it overwrites nothing and can be undone
+  task.undo:
+    tier: Medium
+    private: true
+    description: Reverse the newest change that can be undone, and say what was undone
+  apps.close:
+    tier: Medium
+    private: true
+    description: Ask an app's windows to close, politely; it never kills a program
+  system.wifi:
+    tier: Medium
+    private: true
+    description: Turn Wi-Fi on or off; while it is off, your phone cannot reach this PC
+  files.move:
+    tier: Medium
+    private: true
+    description: Move files into a folder inside your work folder (made if missing); it overwrites nothing and can be undone
+  web.open:
+    tier: Medium
+    private: true
+    description: Open an http or https address in your Chrome or Edge with Kairu's own profile (never yours); Kairu doesn't read the page
+  web.search:
+    tier: Medium
+    private: true
+    description: Search Google in Kairu's own browser profile; the words pass the privacy filter first, and personal ones are refused here
+
+  # Medium: Kairu's hands (PC4, first part, BAR.md "Handling a task"). Only in the safe apps (kairu/tasks/screen.py SAFE_APPS);
+  # anything that may send, submit or delete, personal words, and every other app go to screen.confirm (High)
+  screen.type:
+    tier: Medium
+    private: true
+    description: Type words in a safe app's window, where the cursor is or into its search or address bar (Enter only there); never a secret, never into Kairu's own windows
+  screen.press:
+    tier: Medium
+    private: true
+    description: Press keys that move, edit or navigate in a safe app (Tab, arrows, Esc, Ctrl+T, Ctrl+C, Alt+Left, F5); never Win or Ctrl+Alt keys
+  screen.click:
+    tier: Medium
+    private: true
+    description: Click a button, link, tab or menu item by its name in a safe app; never send, submit, delete, pay or buy
+  # Medium: Kairu's eyes (BAR.md "Kairu's eyes", ADR-051 proposed). Changes nothing on the PC, but a picture leaves it
+  screen.look:
+    tier: Medium
+    private: true
+    description: Look at ONE app window on the safe list for the screen agent ("take control and ...") - a picture of it (in memory, never written) and its buttons' names go to Google Gemini, which proposes one next step that Guardian then decides like any other; never Kairu's own, security, password, terminal or money windows; tasks.eyes in config.yaml switches it on
+
+  # Medium: the screen agent's other steps (ADR-054 proposed, BAR.md "Kairu's eyes"). Scrolling changes nothing; the form
+  # steps only in a safe app; filling puts one of your saved details in a box on the run's site, typed on this PC only
+  screen.scroll:
+    tier: Medium
+    private: true
+    description: Scroll up or down (1 to 10 notches, by the mouse wheel) in an app's window; never Kairu's own, security, password, terminal or money windows
+  screen.choose:
+    tier: Medium
+    private: true
+    description: Pick an item from a list or drop-down by both names, in a safe app
+  screen.tick:
+    tier: Medium
+    private: true
+    description: Tick or untick a box by its name, in a safe app; ticking "I agree" or "I accept" asks you first (screen.agent_confirm or screen.confirm)
+  screen.point:
+    tier: Medium
+    private: true
+    description: Click a point Gemini named on a look's picture, decided by what UI Automation or the picture's words say is there, as a click by name is; with nothing readable there it asks you first
+  screen.fill:
+    tier: Medium
+    private: true
+    description: Type one of your saved details (data/my-details.json, never sent anywhere) into a box by its name, in the browser, only on the site the run is locked to; never a password box, never a secret
+  screen.saved_password:
+    tier: Medium
+    private: true
+    description: Pick the browser's own saved-password suggestion whose name is your saved username for this site, so the browser fills the password itself; Kairu never reads or types a password
+  details.forget:
+    tier: Medium
+    private: true
+    description: Forget one of your saved details (data/my-details.json, on this PC only)
+  hands.unmark_safe:
+    tier: Medium
+    description: Take an app you marked safe off the safe list of Kairu's hands, so every step there asks for your yes and PIN again (stricter, never looser)
+
+  # Medium: asking an AI website (ASK.md). Only the sites in kairu/tasks/ask_ai.py, only in Kairu's own browser profile,
+  # public words only; a page that asks you to sign in is never typed into
+  web.ask:
+    tier: Medium
+    private: true
+    description: Type a question with no personal words into an AI website (Claude, ChatGPT, Gemini, Perplexity) in Kairu's own browser profile and show its answer; the question leaves this PC; never a secret, never a sign-in
+
+  # High
+  files.delete:
+    tier: High
+    private: true
+    description: Move one file or folder in your work folder to the Recycle Bin (never deleted for good); undo restores it
+  web.search_private:
+    tier: High
+    private: true
+    description: Search Google for words the privacy filter calls personal, in Kairu's own browser profile; secrets are never searched, even so
+  web.ask_private:
+    tier: High
+    private: true
+    description: Ask an AI website a question the privacy filter calls personal, in Kairu's own browser profile; secrets are never typed, even so
+  screen.confirm:
+    tier: High
+    private: true
+    description: Type, press or click in an app after your yes and PIN - a step that may send, submit or delete, personal words, or an app not on the safe list; secrets, money, security apps and Kairu's own windows are still refused
+  screen.agent_confirm:
+    tier: High
+    pin: false
+    private: true
+    description: Inside a take-control run you started with your yes, a step that may send, submit, sign in, apply or agree, or an app not on the safe list, after your "yes" (typed, clicked or said; no PIN, ADR-054, the owner's GO of 20 Nov 2026); secrets, captchas, money, security apps and Kairu's own windows are still refused
+  details.keep:
+    tier: High
+    private: true
+    description: Keep one of your details (name, email, phone, city, college, LinkedIn, resume file name, a username for a site) in data/my-details.json, on this PC only, never sent to any AI; a secret is never kept
+  hands.mark_safe:
+    tier: High
+    description: Put one more open app on the safe list of Kairu's hands, so typing, keys and plain clicks there no longer ask for your PIN (steps that may send, submit or delete still do); never a terminal, an editor with a terminal, remote desktop, a security, password or money app, or Kairu's own
+  message.send:
+    tier: High
+    description: Send an email or message for you
+  protect.watch_pc:
+    tier: High
+    description: Watch this PC, read-only - a folder such as Downloads, the devices plugged in, and whether Windows Security is on
+  protect.add_folder:
+    tier: High
+    description: Watch one more folder for risky new files (read-only; system and private folders are refused)
+  protect.connect_email:
+    tier: High
+    description: Give Kairu read-only access to your Gmail (you sign in on Google's own page; Kairu never sees your password)
+  task.order:
+    tier: Low
+    private: true
+    description: Run an order typed on your paired phone through the task core here (PHONE.md, D3); each step is decided on its own
+  device.approver:
+    tier: High
+    description: Let this phone approve its own High requests with its fingerprint (PHONE.md, D2); only your PIN here turns it on
+  shadow.create:
+    tier: High
+    private: true
+    description: Make a Shadow for a friend - a temporary helper on their laptop with one empty folder and a key of its own, joined with an invite and a 6-digit code valid 15 minutes; it carries nothing of yours and can only report back. In cowork mode it also sets up a full Kairu there under your friend's own PIN, removed when it leaves, and brings home its changes to Kairu as a pull request
+  shadow.install:
+    tier: High
+    description: Install the use case (skill pack) a Shadow brought home - exactly the files it signed for, after their tests pass again on this PC; it is your friend's code, so read its pull request first
+  shadow.upgrade:
+    tier: High
+    description: Upgrade your Kairu with the changes a Cowork Shadow brought home - exactly the files it signed for, after Kairu's own check passes on the upgraded Kairu in a separate folder; never if it loosens a Critical rule
+  pack.run:
+    tier: High
+    private: true
+    description: Run an installed skill pack with your words, in a program of its own (code a friend wrote, which you installed with your PIN)
+  device.pair:
+    tier: High
+    description: Pair a new device (your phone) with this PC, with a QR code and a 6-digit code valid 10 minutes
+  mission_mode.on:
+    tier: High
+    description: Mission Mode - keep this PC awake with the lid closed while it charges; the lid setting is always put back
+  brain.send_private:
+    tier: High
+    private: true
+    description: Send a question with personal data to the free cloud AI named here (you see the exact text and where it goes); secrets are never sent, even so
+  provider.add:
+    tier: High
+    description: Save a free AI provider's key on this PC, sealed; it goes only to that provider and is never shown
+  system.sleep:
+    tier: High
+    private: true
+    description: Put this PC to sleep
+  system.restart:
+    tier: High
+    private: true
+    description: Restart this PC; whatever is open and unsaved may be lost
+  system.shutdown:
+    tier: High
+    private: true
+    description: Shut this PC down; whatever is open and unsaved may be lost
+
+  # Clones (TEAM.md): Main Kairu splits a project across Kairus on other laptops; each Clone's own Guardian decides every step
+  team.add:
+    tier: High
+    private: true
+    description: Make a Clone - pair Main Kairu with a Kairu on another laptop, with the offer and 6-digit code that laptop showed; from then on Main Kairu can send it orders, which that laptop's Guardian still decides one by one
+  team.remove:
+    tier: Medium
+    description: Forget a Clone and Main Kairu's keys for it
+  team.split:
+    tier: Low
+    private: true
+    description: Ask the free cloud AI to split a project brief into tasks for your Clones (a public brief only, as with plans); kept on this PC until you start it
+  team.run:
+    tier: Medium
+    description: Run a project - send each Clone its next order through Kairu Link and read what each says; every order is a request that the Clone's own Guardian decides, with that laptop's PIN for High
+  team.set:
+    tier: Medium
+    description: Change a Clone's share of the work or the skills written for it (words for the next split, never a permission)
+  team.move:
+    tier: Medium
+    description: Give a task that hasn't started yet to another of your Clones
+  team.status:
+    tier: Low
+    description: Say how the team's project is going, from the team board on this PC (read only)
+  team.note:
+    tier: Low
+    private: true
+    description: Keep a note Main Kairu sent with its order in this laptop's team inbox, to show you (never an order)
+  team.check:
+    tier: Medium
+    description: Confirm that a team task which is done met its "done when" check (an entry in that person's growth record, which they see too)
+  team.offer:
+    tier: Medium
+    description: Offer a teammate a bigger task; it reaches their laptop with their next order and only they can accept or decline it
+
+  # The Builder (BUILDER.md, ADR-050 proposed): builds from a public brief, skills Forge writes, and Five Paths. The AI only
+  # writes drafts; every step that changes anything is its own action below, or a known skill decided by its own tier
+  build.draft:
+    tier: Low
+    private: true
+    description: Ask the free cloud AI (Gemini first) to write a website, a web app, slides or a small Python program with tests from a public brief; kept as a draft on this PC, nothing written to your work folder yet
+  build.write:
+    tier: Medium
+    private: true
+    description: Make the build you were shown - exactly those files - in a NEW folder in your work folder; it overwrites nothing, and a page it makes never reaches the network by itself
+  build.test:
+    tier: High
+    private: true
+    description: Run the tests of a Python program the Builder made (code an AI wrote), with Python's unittest, in its folder, only while its files are unchanged
+  forge.draft:
+    tier: Low
+    private: true
+    description: Ask the free cloud AI to write a new skill for an order Kairu doesn't know - a recipe of Kairu's known skills only, kept as a draft on this PC
+  forge.test:
+    tier: Low
+    private: true
+    description: Try a recipe Forge wrote five times on a stand-in laptop (a pretend PC in a folder of its own), so nothing on this PC is touched
+  forge.save:
+    tier: High
+    private: true
+    description: Keep a skill Forge wrote, after its five dry runs passed; from then on its order runs as a plan you see first, and Guardian decides each step by its own tier
+  forge.forget:
+    tier: Medium
+    private: true
+    description: Forget a skill Forge learned
+  paths.draft:
+    tier: Low
+    private: true
+    description: Five Paths - ask the free cloud AI for five plans of Kairu's known skills for one public task, and a judge's score for each; nothing runs until you pick one
+
+  # PC5 (BAR.md "Commands and installs"): commands as a list of words, no shell, in the work folder or Kairu's own folder
+  terminal.run:
+    tier: Low
+    private: true
+    description: Run a read-only command from the safe list (git status, log or diff, version checks, pip or winget list) in your work folder or Kairu's folder
+  terminal.run_work:
+    tier: Medium
+    private: true
+    description: Run a work command from the safe list (git pull, add or commit, a test run such as pytest or npm test) in your work folder or Kairu's folder
+  terminal.run_any:
+    tier: High
+    private: true
+    description: Run a command that is not on the safe list, exactly as shown, with no shell, in your work folder or Kairu's folder
+  apps.install:
+    tier: High
+    private: true
+    description: Install an app with winget, Windows' own installer, by its exact name or id
+  apps.uninstall:
+    tier: High
+    private: true
+    description: Uninstall an app with winget
+
+  # Critical (Master Plan v2.0: money, banking and security settings are always blocked)
+  money.spend:
+    tier: Critical
+    description: Spend money, pay, make a purchase or use a banking or payment app
+  security.change:
+    tier: Critical
+    description: Change a security setting
+  credentials.reveal:
+    tier: Critical
+    description: Show, copy or send a password, key or token
+  security.disable:
+    tier: Critical
+    description: Turn off a protection such as antivirus, the firewall or Guardian itself
+  guardian.change_policy:
+    tier: Critical
+    description: Change this policy while Kairu is running
+  system.destroy:
+    tier: Critical
+    description: Irreversible damage to the system, such as formatting a drive
+  terminal.admin:
+    tier: Critical
+    description: Run a command with admin rights, or one that changes Windows' security, boot, users, disks, services or machine-wide registry
+  apps.install_hidden:
+    tier: Critical
+    description: Install an app silently, quietly or hidden, without you seeing it

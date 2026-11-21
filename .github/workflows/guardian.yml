@@ -1,0 +1,34 @@
+# Runs every Guardian test on Windows and Linux with Python 3.12, through the same script you run on your PC.
+name: Guardian tests
+
+on:  # only on pull requests, and when started by hand (Actions tab > Guardian tests > Run workflow)
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30  # Windows runs the whole suite in about 14-15 minutes (c9c35a3 was cancelled at 15)
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Keep the small voice model between runs (it is downloaded from alphacephei.com and SHA-256 checked once)
+        uses: actions/cache@v4
+        with:
+          path: data/voice
+          key: vosk-model-small-en-us-0.15-30f26242c4eb449f
+      - name: Install and run all Guardian tests
+        run: python tools/check_guardian.py
+      - name: Full test output
+        if: always()
+        shell: bash
+        run: cat guardian-check-report.txt || true

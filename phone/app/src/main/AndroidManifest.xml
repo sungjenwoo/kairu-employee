@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Each stage adds only the permissions it needs (PHONE.md). D1: the internet, for the Gate (D7's alarm permission is below). The camera, for the
+     pairing QR code, comes with the QR scanner and is asked for only when you tap Scan. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- D7: alarms, reminders and timers are set in the clock app. A normal permission: Android grants it at install, with
+         no prompt. No SMS, call or contacts permission: messages and calls open ready, and the owner presses Send or Call. -->
+    <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
+    <!-- D7: "call Mom", "text Rahul …": a contact's number by name. Android asks the owner the first time a name is used;
+         the app only reads names and numbers, never changes a contact, and nothing leaves the phone. -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <!-- D6: Kairu hears the owner with the phone's own on-device speech engine (offline). Android asks the first time 🎤 is
+         tapped; the mic opens only after a tap, for one sentence, and nothing is recorded or leaves the phone. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- D7: the apps "open X" may open on the phone, and the apps that take a call, a message or an alarm (Android 11+ only
+         lets an app see the apps it names here). -->
+    <queries>
+        <package android:name="com.whatsapp" />
+        <package android:name="com.instagram.android" />
+        <package android:name="com.android.vending" />
+        <package android:name="com.google.android.apps.maps" />
+        <package android:name="com.google.android.youtube" />
+        <package android:name="com.android.chrome" />
+        <package android:name="com.google.android.gm" />
+        <package android:name="com.spotify.music" />
+        <intent><action android:name="android.intent.action.DIAL" /></intent>
+        <intent><action android:name="android.intent.action.SENDTO" /><data android:scheme="smsto" /></intent>
+        <intent><action android:name="android.intent.action.SET_ALARM" /></intent>
+        <intent><action android:name="android.intent.action.SET_TIMER" /></intent>
+        <intent><action android:name="android.media.action.STILL_IMAGE_CAMERA" /></intent>
+        <!-- D6: Android's speech recognizer (it holds the microphone, not this app) and its text-to-speech voice -->
+        <intent><action android:name="android.speech.action.RECOGNIZE_SPEECH" /></intent>
+        <intent><action android:name="android.intent.action.TTS_SERVICE" /></intent>
+    </queries>
+
+    <application
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Kairu">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name="com.journeyapps.barcodescanner.CaptureActivity"
+            android:screenOrientation="fullSensor"
+            tools:replace="screenOrientation" />
+    </application>
+
+</manifest>

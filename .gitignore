@@ -1,0 +1,15 @@
+__pycache__/
+.pytest_cache/
+*.egg-info/
+.venv/
+.venv-guardian/
+.venv-hearing/
+guardian-check-report.txt
+
+# Kairu Guardian: guardian.db (audit log, Safe Mode, PIN hash) and audit.anchor stay on this PC
+data/
+
+# Kairu voice: the offline speech models stay on this PC (`kairu voice setup` puts them in data/voice/); never committed
+vosk-model-*/
+vosk-model-*.zip
+*.zip.part

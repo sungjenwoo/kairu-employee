@@ -1,0 +1,54 @@
+# Kairu settings. Read once at start; nothing in Kairu changes them while it runs.
+
+voice:
+  enabled: false   # speech in and out is off: Guardian refuses every voice.* action; true turns on the light voice (VOICE.md)
+  # model: small-en-us  # the offline speech model `kairu voice setup` downloads: small-en-us (default) or small-en-in
+  # key: V              # Ctrl+Alt+this letter starts listening (not K, and not tasks.bar_key)
+  # voice: uk-jenny     # Kairu's voice (Piper), one of 16 (VOICE.md); `kairu voice try --voices` plays each so you can pick
+  # style: warm         # how Kairu says an answer: warm (default), lively, calm or plain (VOICE.md "How Kairu sounds")
+  # tts: kokoro         # the voice engine: kokoro (default, human-sounding; VOICE.md "Kokoro") or piper
+  # kokoro_voice: af_heart  # Kokoro's voice; `kairu voice try --voices` plays each so you can pick
+  # live: true          # Kairu Live (LiveKit) is the bar's voice: Deepgram hears, Gemini thinks, ElevenLabs speaks (VOICE.md "Kairu Live")
+  # live_folder: C:\Users\you\kairu-live\kairu-live   # the Kairu Live folder, with its .venv and .env
+research:
+  enabled: false   # web research is off: Guardian refuses every research.* action; true turns on live search (RESEARCH.md)
+
+protect:
+  enabled: true         # Guardian starts its monitors by itself (protect.watch); they watch only what you connected
+  check_seconds: 60     # deadline reminders: checked every minute
+  gmail_seconds: 120    # Gmail: new emails checked every 2 minutes
+
+link:                   # Kairu Link (LINK.md): your phone and this PC, through the Gate
+  enabled: true         # Guardian reads messages from your paired devices; nothing happens until you pair one
+  relay: https://ntfy.sh  # the Gate's relay (ntfy); a home ntfy server can replace it later
+
+mission_mode:           # the PC stays awake with the lid closed while it charges (`kairu mission-mode on`)
+  max_hours: 4          # it ends after this long
+  max_celsius: 85       # ... or at this temperature, where Windows gives one (this PC gives none)
+  cpu_percent: 85       # ... or when the processor stays above this
+  cpu_minutes: 10       #     for this many minutes in a row
+
+brain:                  # Kairu's brain (BRAIN.md): the Model Gateway, free cloud AI, Mission Cards
+  public_to_cloud: true # option A (29 Oct): a question with no personal data goes to a free provider that does not
+                        # train on prompts, without asking; false: every cloud send waits for "yes" and your PIN
+  providers: [groq, cloudflare, openrouter]  # tried in this order; one at its free limit is skipped
+  build_providers: [gemini, groq, openrouter]  # the Builder (BUILDER.md): Gemini thinks first for sites, apps, slides,
+                        # Forge and Five Paths, then Groq, then Gemma on OpenRouter; public briefs only. Leave it out to use
+                        # providers. Gemini's free tier may use what is sent to improve Google's products
+  daily_cap: 0          # cloud questions a day, all providers together; 0: no cap (ADR-006)
+  talk_history: true    # Kairu keeps your talks at the PC on this PC only, 30 days (MEMORY.md "Talk history"); false: none
+  # models:             # only if a provider retires the model Kairu uses: the model to use instead
+  #   groq: openai/gpt-oss-120b
+
+tasks:                  # the Kairu bar's tasks (BAR.md)
+  # work_folder: D:/KairuFiles  # the only folder Kairu may find, move, rename or delete files in; by default Kairu-files in your user folder.
+                        # Only you change it, here, and restart Guardian; no Kairu action can
+  # bar_key: Q          # if another program holds Ctrl+Alt+Space: Ctrl+Alt+this letter shows and hides the bar (not K)
+  eyes: true            # Kairu's eyes (BAR.md "Kairu's eyes"): "take control and ..." sends a picture of ONE window on the safe
+                        # list to Google Gemini, which names the next click, typing or key; Guardian decides each step.
+                        # Gemini's free tier may keep what is sent to improve Google's products. false: no picture leaves
+
+guardian:
+  policy: policy.yaml   # relative to this file
+  data_dir: data        # guardian.db (audit log, Safe Mode, PIN hash) and audit.anchor go here; relative to this file
+  # anchor: D:/KairuAnchor/audit.anchor   # optional: keep the audit anchor in another folder, so deleting the data folder alone is noticed

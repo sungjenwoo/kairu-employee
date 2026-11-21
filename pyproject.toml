@@ -1,0 +1,69 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kairu"
+version = "0.0.1"
+description = "Kairu: the Guardian safety core (policy tiers, approvals with a PIN, emergency stop, Safe Mode, hash-chained audit log), protection, Kairu Link, the brain, the bar and the light voice"
+requires-python = ">=3.12"
+dependencies = [
+    "PyYAML>=6",        # reads policy.yaml and config.yaml
+    "argon2-cffi>=23",  # hashes the PIN (Argon2id)
+    # Kairu Link (Phase C): Ed25519 signatures and X25519 encryption (crypto_box) for messages between the PC and
+    # the phone. Python's standard library has neither, and hand-written crypto must not guard real messages;
+    # PyNaCl wraps libsodium, which is small, audited and ships as wheels for Windows and Linux. Only the Link's own
+    # processes load it, never the Guardian program.
+    "PyNaCl>=1.5",
+    # The pairing QR code in the terminal (`kairu device pair`). The standard library cannot draw one; segno is pure
+    # Python with no dependencies of its own, and only `kairu device pair` loads it.
+    "segno>=1.5",
+    # Live web research (stage R1): Python has no search engine built in, and DuckDuckGo has no free API for web results.
+    # ddgs is MIT, free, needs no key or account, and reads DuckDuckGo's own page. It brings primp and lxml (about 25 MB
+    # on disk, wheels for Windows and Linux). Only research.web_search's own process loads it, never the Guardian program.
+    # Held below 10 because Kairu uses its DuckDuckGo engine directly (a test checks that part still fits).
+    "ddgs>=9.16,<10",
+    # Light voice (Sprint Day 2, VOICE.md): offline speech-to-text. Python has none, and the voice must never leave the PC.
+    # Vosk (Apache 2.0) runs Kaldi's small models on the CPU with no account, key or network; wheels for Windows and Linux
+    # (about 14 MB, with cffi, requests, tqdm, srt and websockets beside it). Its grammar mode is how "Kairu" is heard.
+    # Only voice.listen's own process loads it, never the Guardian program or the bar. No audio-capture package: the
+    # microphone is read with Windows' own waveIn functions through ctypes.
+    "vosk>=0.3.45,<0.4",
+    # The default way Kairu hears you (voice.engine: whisper, VOICE.md): Whisper tiny.en heard the owner's own Indian English
+    # far better than the small Vosk model (wake word 10/10 against 0-4/10, 10 Nov 2026). faster-whisper (MIT) runs it
+    # offline on the CPU through CTranslate2, with no account, key or network; the model (MIT weights) comes only from
+    # `kairu voice setup`, SHA-256 pinned. It brings ctranslate2 (MIT), numpy (BSD), tokenizers and huggingface-hub
+    # (Apache-2.0), onnxruntime (MIT), tqdm (MIT/MPL-2.0) and PyAV (BSD, with FFmpeg under the LGPL): about 260 MB on disk,
+    # wheels for Windows and Linux. Only voice.listen's own process loads it, and never PyAV, the downloader or onnxruntime
+    # (kairu/voice/whisper.py): the sound comes from memory and the speech gate is numpy. Vosk stays as the fallback.
+    "faster-whisper>=1.2.1,<1.3",
+    # Kairu's spoken voice is Piper (VOICE.md), and it is not a Python package here. Windows has no natural offline voice a
+    # program may use; Piper is a free offline neural voice. Kairu uses the MIT-licensed standalone build of rhasspy/piper,
+    # release 2023.11.14-2 for Windows (piper.exe with onnxruntime, MIT), downloaded by `kairu voice setup` with a pinned
+    # SHA-256 and run by voice.speak as a separate program: nothing of it is imported or linked, and Kairu does not use the
+    # GPL piper-tts package on PyPI. The build bundles espeak-ng (GPL-3.0) for pronunciation; it is used on your own PC for
+    # personal use and is not distributed with Kairu. Its voices come from rhasspy/piper-voices v1.0.0, also SHA-256 pinned.
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+# Kokoro, the human-sounding voice (VOICE.md "Kokoro"): only for kairu/voice/kokoro_worker.py, its own program.
+# phonemizer and espeak-ng (in espeakng-loader) are GPL-3.0; no other Kairu program loads them.
+kokoro = ["kokoro-onnx==0.6.1", "espeakng-loader==0.2.4", "phonemizer==3.6.0"]
+# The camera check (VOICE.md "The camera check", voice.camera): OpenCV reads the webcam and finds the face; nothing in the
+# standard library can. Only kairu/voice/lips.py imports it, and only while the mic is on with voice.camera: true.
+camera = ["opencv-python>=4.9,<5"]
+
+[project.scripts]
+kairu = "kairu.cli:main"
+kairu-link-test = "kairu.link.testclient:main"  # a stand-in phone for pairing and sending (standard library only)
+
+[tool.setuptools]
+packages = ["kairu", "kairu.protect", "kairu.link", "kairu.brain", "kairu.missions", "kairu.research", "kairu.memory", "kairu.tasks", "kairu.bar", "kairu.voice", "kairu.workspace", "kairu.shadow", "kairu.team", "kairu.build"]  # only Kairu; the voice prototype, where present, is not part of this package
+
+[tool.setuptools.package-data]
+"kairu.workspace" = ["page.html"]  # the workspace window's page, served by kairu/workspace/server.py
+
+[tool.pytest.ini_options]  # used where there is no pytest.ini (the voice prototype's branches have one)
+testpaths = ["tests_kairu"]
+pythonpath = ["."]

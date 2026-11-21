@@ -1,0 +1,1280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kairu</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Cpath d=%22M2 0h18a12 12 0 0 1 12 12v18a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2z%22 fill=%22%230b0b0c%22/%3E%3Crect x=%226.5%22 y=%2211%22 width=%2219%22 height=%2210%22 rx=%225%22 fill=%22%230b0b0c%22 stroke=%22%23fff%22 stroke-width=%222.6%22/%3E%3C/svg%3E">
+<style nonce="{{NONCE}}">
+:root {
+  --bg: #262624; --side: #1f1e1d; --surface: #30302e; --raised: #3a3936; --border: #3d3d3a; --border-strong: #55544f;
+  --text: #ececea; --muted: #a6a39b; --quiet: #7d7b74; --accent: #3b82f6; --accent-soft: rgba(59,130,246,.16);
+  --red: #e5484d; --red-soft: rgba(229,72,77,.15); --green: #3fb27f; --amber: #e0a43a; --amber-soft: rgba(224,164,58,.14);
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+  --sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --mono: "Cascadia Mono", Consolas, ui-monospace, monospace;
+  --ember-blue: #4FC3FF; --ember-red: #FF4545;
+}
+@media (prefers-color-scheme: light) {
+  :root { --bg: #faf9f5; --side: #f0eee6; --surface: #ffffff; --raised: #f4f2ec; --border: #e3e0d6; --border-strong: #cfcbbf;
+    --text: #1f1e1d; --muted: #6b6a65; --quiet: #8f8d86; --accent-soft: rgba(59,130,246,.12); --red-soft: rgba(229,72,77,.1);
+    --amber-soft: rgba(224,164,58,.14); }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 14px/1.5 var(--sans); }
+button, input, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; border: 0; background: none; padding: 0; }
+button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.app { display: grid; grid-template-columns: 272px minmax(0, 1fr); height: 100vh; }
+.app.side-closed { grid-template-columns: 0 minmax(0, 1fr); }
+.app.side-closed .side { visibility: hidden; }
+
+/* --- sidebar --- */
+.side { background: var(--side); border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.side-top { display: flex; align-items: center; gap: 10px; padding: 14px 14px 8px; }
+.brand { font-weight: 600; font-size: 16px; letter-spacing: .2px; }
+.logo { width: 28px; height: 28px; flex: none; }
+.logo .tile { fill: #0b0b0c; }
+.logo .ring { fill: #0b0b0c; stroke: #fff; transition: stroke .3s, filter .3s; }
+.logo.listening .ring { stroke: var(--ember-blue); filter: drop-shadow(0 0 2px var(--ember-blue)); }
+.logo.working .ring { stroke: var(--ember-red); filter: drop-shadow(0 0 2px var(--ember-red)); }
+@media (prefers-color-scheme: light) { .side .logo .tile, .hero .logo .tile { fill: #0b0b0c; } }
+.icon-btn { width: 30px; height: 30px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; color: var(--muted); }
+.icon-btn:hover { background: var(--raised); color: var(--text); }
+.icon { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.grow { flex: 1; }
+.new-btn { margin: 4px 12px 8px; display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 10px;
+  background: var(--surface); border: 1px solid var(--border); font-weight: 500; }
+.new-btn:hover { border-color: var(--border-strong); }
+.search { margin: 0 12px 8px; position: relative; }
+.search input { width: 100%; padding: 7px 10px 7px 32px; border-radius: 8px; border: 1px solid transparent; background: transparent; }
+.search input:hover, .search input:focus { background: var(--surface); border-color: var(--border); outline: none; }
+.search .icon { position: absolute; left: 9px; top: 9px; color: var(--quiet); width: 16px; height: 16px; }
+.nav { padding: 0 8px; }
+.nav-item { width: 100%; display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 8px; color: var(--muted); text-align: left; }
+.nav-item:hover { background: var(--raised); color: var(--text); }
+.nav-item.on { background: var(--raised); color: var(--text); }
+.nav-item .count { margin-left: auto; font-size: 12px; color: var(--quiet); }
+.side-scroll { flex: 1; overflow-y: auto; padding: 4px 8px 12px; min-height: 0; }
+.group { font-size: 12px; color: var(--quiet); padding: 14px 10px 4px; display: flex; align-items: center; }
+.group button { margin-left: auto; color: var(--quiet); font-size: 12px; }
+.group button:hover { color: var(--text); }
+.row { width: 100%; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 8px; text-align: left; color: var(--text); }
+.row:hover { background: var(--raised); }
+.row.on { background: var(--raised); }
+.row .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.row .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--red); flex: none; }
+.row.project .label { font-weight: 500; }
+.row.child { padding-left: 30px; color: var(--muted); }
+.row.child.on, .row.child:hover { color: var(--text); }
+.chev { width: 14px; height: 14px; color: var(--quiet); transition: transform .15s; flex: none; }
+.chev.open { transform: rotate(90deg); }
+.empty-side { color: var(--quiet); padding: 6px 10px; font-size: 13px; }
+.side-bottom { border-top: 1px solid var(--border); padding: 10px 12px; display: flex; align-items: center; gap: 8px; }
+.pill { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; padding: 3px 10px; border-radius: 999px; background: var(--raised); color: var(--muted); }
+.pill .light { width: 8px; height: 8px; border-radius: 50%; background: var(--quiet); }
+.pill.running .light { background: var(--green); }
+.pill.safe .light { background: var(--amber); }
+.pill.down .light { background: var(--red); }
+
+/* --- main --- */
+.main { display: grid; grid-template-rows: auto minmax(0, 1fr); min-width: 0; min-height: 0; }
+.top { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--border); min-height: 52px; }
+.crumb { color: var(--muted); display: flex; align-items: center; gap: 6px; min-width: 0; }
+.crumb button:hover { color: var(--text); }
+.crumb .title { color: var(--text); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stop { background: var(--red); color: #fff; font-weight: 600; padding: 6px 14px; border-radius: 8px; }
+.stop:hover { filter: brightness(1.08); }
+.body { display: grid; grid-template-columns: minmax(0, 1fr) 300px; min-height: 0; }
+.body.no-panel { grid-template-columns: minmax(0, 1fr); }
+.body.no-panel .panel { display: none; }
+.center { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.scroll { flex: 1; overflow-y: auto; min-height: 0; }
+.column { max-width: 760px; margin: 0 auto; padding: 28px 24px 24px; }
+.panel { border-left: 1px solid var(--border); overflow-y: auto; padding: 18px 16px; background: var(--bg); }
+.panel h3 { font-size: 13px; font-weight: 600; margin: 0 0 10px; color: var(--muted); }
+.panel section { margin-bottom: 22px; }
+
+/* --- home --- */
+.hero { text-align: center; padding: 12vh 0 28px; }
+.hero .logo { width: 52px; height: 52px; margin-bottom: 14px; }
+.hero h1 { font: 400 32px/1.25 var(--serif); margin: 0 0 6px; }
+.hero p { color: var(--muted); margin: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 18px; }
+.chip { border: 1px solid var(--border); border-radius: 999px; padding: 6px 14px; color: var(--muted); background: var(--surface); }
+.chip:hover { color: var(--text); border-color: var(--border-strong); }
+
+/* --- composer --- */
+.composer-wrap { padding: 0 24px 18px; }
+.composer { max-width: 760px; margin: 0 auto; border: 1px solid var(--border); background: var(--surface); border-radius: 16px; padding: 12px 12px 8px 16px; }
+.composer:focus-within { border-color: var(--border-strong); }
+.composer textarea { width: 100%; border: 0; background: transparent; resize: none; outline: none; min-height: 24px; max-height: 200px; line-height: 1.5; }
+.composer .tools { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.where { font-size: 12px; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; }
+.where:hover { color: var(--text); }
+.hint { font-size: 12px; color: var(--quiet); }
+.send { width: 32px; height: 32px; border-radius: 9px; background: var(--text); color: var(--bg); display: inline-flex; align-items: center; justify-content: center; }
+.send:hover { filter: brightness(.9); }
+.error { color: var(--red); font-size: 13px; margin: 6px 4px 0; min-height: 0; }
+.picker { margin-top: 8px; border-top: 1px solid var(--border); padding-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+.picker button { font-size: 12px; padding: 3px 10px; border-radius: 999px; background: var(--raised); color: var(--muted); }
+.picker button.on, .picker button:hover { color: var(--text); background: var(--accent-soft); }
+
+/* --- messages --- */
+.msg { margin: 0 0 22px; }
+.msg.you { display: flex; justify-content: flex-end; }
+.msg.you .bubble { background: var(--raised); border-radius: 16px; padding: 9px 14px; max-width: 80%; white-space: pre-wrap; word-break: break-word; }
+.msg.kairu { display: flex; gap: 12px; }
+.msg.kairu .logo { width: 24px; height: 24px; margin-top: 2px; }
+.msg.kairu .text { font: 16px/1.65 var(--serif); white-space: pre-wrap; word-break: break-word; }
+.steps-block { margin: -12px 0 22px 36px; border-left: 2px solid var(--border); padding-left: 12px; }
+.step { display: flex; align-items: flex-start; gap: 8px; color: var(--muted); font-size: 13px; padding: 2px 0; }
+.step .mark { width: 16px; height: 16px; flex: none; margin-top: 2px; }
+.step.done .mark { color: var(--green); }
+.step.not .mark { color: var(--red); }
+.step.running { color: var(--text); }
+.step.running .mark { color: var(--accent); animation: spin 1s linear infinite; }
+.step.waiting .mark { color: var(--quiet); }
+.working-line { display: flex; gap: 12px; align-items: center; color: var(--muted); margin-bottom: 22px; }
+.working-line .logo { width: 24px; height: 24px; }
+.dots span { display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: var(--muted); margin-right: 3px; animation: blink 1.2s infinite; }
+.dots span:nth-child(2) { animation-delay: .2s; } .dots span:nth-child(3) { animation-delay: .4s; }
+@keyframes blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .step.running .mark, .dots span { animation: none; } }
+
+/* --- the card --- */
+.card { max-width: 760px; margin: 0 auto 12px; border: 1px solid var(--amber); background: var(--amber-soft); border-radius: 14px; padding: 14px 16px; }
+.card h4 { margin: 0 0 6px; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+.card .lines { font-size: 13px; color: var(--text); white-space: pre-wrap; word-break: break-word; margin-bottom: 10px; }
+.card .lines div { padding: 1px 0; }
+.card .answer { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.card label { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.card input { width: 88px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--surface); }
+.card input.pin { width: 120px; -webkit-text-security: disc; letter-spacing: 2px; }
+.card .time { font-size: 12px; color: var(--quiet); margin-left: auto; }
+.btn { padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--surface); font-weight: 500; }
+.btn:hover { border-color: var(--text); }
+.btn.primary { background: var(--text); color: var(--bg); border-color: var(--text); }
+.btn.danger { color: var(--red); }
+
+/* --- pages --- */
+.page-title { font: 400 28px/1.3 var(--serif); margin: 0 0 6px; }
+.page-sub { color: var(--muted); margin: 0 0 24px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.tile { border: 1px solid var(--border); background: var(--surface); border-radius: 12px; padding: 14px 16px; text-align: left; min-height: 96px; display: flex; flex-direction: column; }
+.tile:hover { border-color: var(--border-strong); }
+.tile .name { font-weight: 600; margin-bottom: 4px; }
+.tile .meta { color: var(--quiet); font-size: 12px; margin-top: auto; }
+.tile .notes { color: var(--muted); font-size: 13px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.tile .notes.full { display: block; }
+.list { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--surface); }
+.list .item { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-top: 1px solid var(--border); width: 100%; text-align: left; }
+.list .item:first-child { border-top: 0; }
+.list button.item:hover { background: var(--raised); }
+.list .item .when { margin-left: auto; color: var(--quiet); font-size: 12px; white-space: nowrap; }
+.field { width: 100%; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); }
+textarea.field { min-height: 90px; resize: vertical; }
+.name-input { font: 400 28px/1.3 var(--serif); border: 1px solid transparent; background: transparent; width: 100%; padding: 2px 6px; margin-left: -7px; border-radius: 8px; }
+.name-input:hover, .name-input:focus { border-color: var(--border); outline: none; }
+.actions { display: flex; gap: 8px; margin: 14px 0 24px; flex-wrap: wrap; }
+.section-h { font-size: 13px; color: var(--muted); font-weight: 600; margin: 26px 0 10px; }
+.note { border: 1px dashed var(--border-strong); border-radius: 12px; padding: 14px 16px; color: var(--muted); }
+.note b { color: var(--text); }
+.compare { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.compare .tile { min-height: 0; }
+.compare ul { margin: 6px 0 0; padding-left: 18px; color: var(--muted); font-size: 13px; }
+.team-head { margin-bottom: 12px; }
+.team-bar { height: 8px; border-radius: 999px; background: var(--raised); overflow: hidden; }
+.team-bar .fill { height: 100%; background: var(--text); transition: width .4s; }
+.team-bar.risk .fill { background: var(--red); }
+.team-facts { display: flex; flex-wrap: wrap; gap: 14px; align-items: baseline; margin-top: 8px; color: var(--muted); font-size: 13px; }
+.team-facts .big { font: 400 22px var(--serif); color: var(--text); }
+.risk-text { color: var(--red); font-weight: 600; }
+.team-task { align-items: flex-start; }
+.team-task.slip { box-shadow: inset 3px 0 0 var(--red); }
+.team-left { min-width: 92px; }
+.team-mid { flex: 1; min-width: 0; }
+.team-mid .t { font-weight: 600; }
+.team-mid .last { font-size: 12px; color: var(--muted); margin-top: 3px; white-space: pre-wrap; word-break: break-word; }
+.team-bar.time { height: 4px; margin-top: 6px; }
+.team-bar.time .fill { background: var(--muted); }
+.team-bar.time.behind .fill { background: var(--red); }
+.team-feed .item { font-size: 13px; }
+.team-feed .who { font-weight: 600; margin-right: 6px; }
+.chip { font-size: 11px; padding: 1px 8px; border-radius: 999px; background: var(--raised); color: var(--muted); white-space: nowrap; }
+.chip.done { color: var(--text); }
+.chip.working { background: var(--amber-soft); color: var(--amber); }
+.chip.blocked { background: var(--red-soft); color: var(--red); }
+.tile .meta.warn { color: var(--amber); }
+.sev { font-size: 11px; padding: 1px 8px; border-radius: 999px; background: var(--raised); color: var(--muted); text-transform: capitalize; }
+.sev.high, .sev.critical { background: var(--red-soft); color: var(--red); }
+.sev.medium { background: var(--amber-soft); color: var(--amber); }
+.kbd { font: 12px var(--mono); border: 1px solid var(--border-strong); border-bottom-width: 2px; border-radius: 5px; padding: 0 5px; }
+.panel .muted, .muted { color: var(--quiet); font-size: 13px; }
+.info-row { display: flex; justify-content: space-between; font-size: 13px; padding: 3px 0; color: var(--muted); }
+.info-row span:last-child { color: var(--text); }
+.toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 8px 16px; border-radius: 10px; font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+.toast.show { opacity: 1; }
+.lost { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--bg); text-align: center; padding: 24px; }
+.lost h2 { font: 400 26px var(--serif); margin: 12px 0 6px; }
+/* --- Ember Glow (the owner's design, 10 Nov): the glass bar above the box you type in --- */
+.glass-slot { padding: 6px 24px 12px; display: flex; justify-content: center; }
+.glass { --glow: var(--ember-blue); position: relative; width: min(580px, 100%); height: 58px; transition: width .7s cubic-bezier(.34,1.3,.64,1); }
+.glass[data-mode="work"] { --glow: var(--ember-red); width: min(500px, 100%); }
+.glass[data-mode="done"] { --glow: #ffffff; width: min(340px, 100%); }
+.glass .pool { position: absolute; left: 12%; right: 12%; top: 55%; height: 40px; border-radius: 50%; background: var(--glow); filter: blur(24px); opacity: .5; animation: breathe 3s ease-in-out infinite; transition: background .5s; }
+.glass[data-mode="done"] .pool { opacity: .12; animation: none; }
+.glass .rim { position: absolute; inset: 0; border-radius: 999px; box-shadow: 0 0 0 1px var(--glow); opacity: .6; transition: box-shadow .4s; }
+.glass .embers { position: absolute; inset: 0; pointer-events: none; }
+.glass[data-mode="done"] .embers { display: none; }
+.embers span { position: absolute; bottom: 48px; border-radius: 999px; background: var(--glow); box-shadow: 0 0 6px var(--glow); opacity: 0; animation: kember 3s ease-out infinite; }
+.embers span:nth-child(1) { left: 30%; width: 3px; height: 3px; animation-delay: 0s; animation-duration: 3s; }
+.embers span:nth-child(2) { left: 56%; width: 3px; height: 3px; animation-delay: 1.1s; animation-duration: 3s; }
+.embers span:nth-child(3) { left: 78%; width: 3px; height: 3px; animation-delay: 2.0s; animation-duration: 3s; }
+.embers span:nth-child(4) { left: 10%; width: 2px; height: 2px; animation-delay: 0.4s; animation-duration: 3.4s; }
+.embers span:nth-child(5) { left: 18%; width: 3px; height: 3px; animation-delay: 1.6s; animation-duration: 2.8s; }
+.embers span:nth-child(6) { left: 24%; width: 2px; height: 2px; animation-delay: 2.6s; animation-duration: 3.2s; }
+.embers span:nth-child(7) { left: 38%; width: 4px; height: 4px; animation-delay: 0.7s; animation-duration: 3.6s; }
+.embers span:nth-child(8) { left: 45%; width: 2px; height: 2px; animation-delay: 1.9s; animation-duration: 2.9s; }
+.embers span:nth-child(9) { left: 50%; width: 3px; height: 3px; animation-delay: 0.2s; animation-duration: 3.3s; }
+.embers span:nth-child(10) { left: 63%; width: 2px; height: 2px; animation-delay: 2.3s; animation-duration: 3.0s; }
+.embers span:nth-child(11) { left: 69%; width: 3px; height: 3px; animation-delay: 0.9s; animation-duration: 3.5s; }
+.embers span:nth-child(12) { left: 85%; width: 2px; height: 2px; animation-delay: 1.4s; animation-duration: 2.7s; }
+.embers span:nth-child(13) { left: 91%; width: 3px; height: 3px; animation-delay: 2.8s; animation-duration: 3.1s; }
+.glass .pane { position: absolute; inset: 2px; border-radius: 999px; overflow: hidden; background: rgba(14,14,20,.72); backdrop-filter: blur(26px) saturate(180%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.35); display: flex; align-items: center; gap: 12px; padding: 0 22px 0 9px; color: #fff; }
+.glass .mark { width: 36px; height: 36px; flex: none; border-radius: 3px 13px 3px 3px; background: #0b0b0c; display: flex; align-items: center; justify-content: center; }
+.glass .mark i { width: 23px; height: 12px; border-radius: 999px; background: var(--glow); box-shadow: 0 0 10px var(--glow); display: flex; align-items: center; justify-content: center; }
+.glass .mark i::after { content: ""; width: 17px; height: 7px; border-radius: 999px; background: #0b0b0c; }
+.glass[data-mode="done"] .mark { display: none; }
+.glass .said { flex: 1; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.glass[data-mode="done"] .pane { justify-content: center; }
+.glass[data-mode="done"] .said { flex: none; }
+.glass .wave { display: flex; align-items: center; gap: 3px; height: 26px; }
+.glass .wave span { width: 3px; height: 26px; border-radius: 2px; background: #8FD9FF; animation: wave .9s ease-in-out infinite; }
+.glass .wave span:nth-child(2) { animation-delay: .15s; } .glass .wave span:nth-child(3) { animation-delay: .3s; } .glass .wave span:nth-child(4) { animation-delay: .45s; }
+.glass .pct { font-size: 14px; font-weight: 600; color: #FFB3B3; }
+.glass .tick { width: 18px; height: 18px; fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+@keyframes kember { 0% { transform: translateY(0); opacity: 0; } 25% { opacity: .9; } 100% { transform: translateY(-46px); opacity: 0; } }
+@keyframes breathe { 0%, 100% { opacity: .35; } 50% { opacity: .6; } }
+@keyframes wave { 0%, 100% { transform: scaleY(.3); } 50% { transform: scaleY(1); } }
+@media (prefers-reduced-motion: reduce) { .glass .pool, .embers span, .glass .wave span { animation: none; } .embers span { display: none; } }
+
+/* --- the mic --- */
+.mic { width: 32px; height: 32px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; color: var(--muted); border: 1px solid var(--border); }
+.mic:hover { color: var(--text); border-color: var(--border-strong); }
+.mic.starting { color: var(--ember-blue); border-color: var(--ember-blue); animation: breathe 1.2s ease-in-out infinite; }
+.mic.on { background: var(--ember-blue); border-color: var(--ember-blue); color: #0b0b0c; box-shadow: 0 0 12px rgba(79,195,255,.55); }
+.voice-line { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+
+/* --- files (W2) --- */
+.file { display: flex; align-items: flex-start; gap: 8px; padding: 8px 0; border-top: 1px solid var(--border); font-size: 13px; }
+.file:first-of-type { border-top: 0; }
+.file .icon { width: 16px; height: 16px; color: var(--quiet); flex: none; margin-top: 2px; }
+.file .meta { display: flex; align-items: center; gap: 6px; margin-top: 3px; }
+.file .what { flex: 1; min-width: 0; }
+.file .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.file .name.link { cursor: pointer; }
+.file .name.link:hover { text-decoration: underline; color: var(--accent); }
+.file .how { color: var(--quiet); font-size: 12px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file .go { font-size: 12px; color: var(--muted); padding: 2px 7px; border-radius: 6px; border: 1px solid var(--border); white-space: nowrap; }
+.file .go:hover { color: var(--text); border-color: var(--border-strong); }
+.panel-btn { display: none; font-size: 13px; color: var(--muted); border: 1px solid var(--border); border-radius: 8px; padding: 5px 10px; }
+.panel-btn:hover, .panel-btn.on { color: var(--text); border-color: var(--border-strong); }
+/* A narrow window (a small screen, or Windows' 125-150 % scaling): the right panel opens over the mission with its button */
+@media (max-width: 980px) {
+  .body { grid-template-columns: minmax(0, 1fr); position: relative; }
+  .panel { display: none; position: absolute; top: 0; right: 0; bottom: 0; width: min(320px, 92%); z-index: 5; box-shadow: -12px 0 32px rgba(0,0,0,.25); }
+  .body.panel-open .panel { display: block; }
+  .panel-btn.can { display: inline-block; }
+}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <aside class="side" aria-label="Projects and missions">
+    <div class="side-top">
+      <svg class="logo" id="side-logo" viewBox="0 0 32 32" aria-hidden="true"><path class="tile" d="M2 0h18a12 12 0 0 1 12 12v18a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2z"/><rect class="ring" x="6.5" y="11" width="19" height="10" rx="5" stroke-width="2.6"/></svg>
+      <span class="brand">Kairu</span>
+      <span class="grow"></span>
+      <button class="icon-btn" id="close-side" title="Close the sidebar" aria-label="Close the sidebar"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></svg></button>
+    </div>
+    <button class="new-btn" id="new-mission"><svg class="icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New mission</button>
+    <div class="search"><svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg><input id="search" type="search" placeholder="Search missions" autocomplete="off" spellcheck="false" aria-label="Search missions"></div>
+    <nav class="nav">
+      <button class="nav-item" data-page="projects"><svg class="icon" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Projects<span class="count" id="project-count"></span></button>
+      <button class="nav-item" data-page="guardian"><svg class="icon" viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.5 3 8.2 7 10 4-1.8 7-5.5 7-10V6z"/></svg>Guardian<span class="count" id="alert-count"></span></button>
+      <button class="nav-item" data-page="clones"><svg class="icon" viewBox="0 0 24 24"><circle cx="8" cy="9" r="3"/><circle cx="16" cy="9" r="3"/><path d="M3 19c.6-2.8 2.6-4.5 5-4.5s4.4 1.7 5 4.5M11 19c.6-2.8 2.6-4.5 5-4.5s4.4 1.7 5 4.5"/></svg>Clones</button>
+      <button class="nav-item" data-page="shadows"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.8-3.6 3.6-6 7-6s6.2 2.4 7 6"/><path d="M17 4.5c1.4.6 2.4 2 2.4 3.6"/></svg>Shadows</button>
+      <button class="nav-item" data-page="devices"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4" width="13" height="10" rx="2"/><rect x="15" y="9" width="6" height="11" rx="1.5"/><path d="M7 18h6"/></svg>Devices</button>
+    </nav>
+    <div class="side-scroll" id="side-list"></div>
+    <div class="side-bottom">
+      <span class="pill" id="guardian-pill"><span class="light"></span><span id="guardian-text">Checking Guardian</span></span>
+      <span class="grow"></span>
+      <button class="icon-btn" data-page="settings" title="Settings" aria-label="Settings"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6"/></svg></button>
+    </div>
+  </aside>
+  <main class="main">
+    <header class="top">
+      <button class="icon-btn" id="open-side" title="Open the sidebar" aria-label="Open the sidebar" hidden><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></svg></button>
+      <div class="crumb" id="crumb"></div>
+      <span class="grow"></span>
+      <button class="panel-btn" id="panel-btn" title="Progress, files and this mission's details">Files &amp; progress</button>
+      <button class="stop" id="stop" title="Stop everything now (the same as Ctrl+Alt+K)">Stop</button>
+    </header>
+    <div class="body" id="body">
+      <div class="center">
+        <div class="scroll" id="scroll"><div class="column" id="view"></div></div>
+        <div class="glass-slot" id="glass-slot" hidden>
+          <div class="glass" id="glass" role="status" aria-live="polite">
+            <div class="pool"></div><div class="rim"></div>
+            <div class="embers"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+            <div class="pane"><span class="mark"><i></i></span><span class="said" id="glass-said"></span><span id="glass-end"></span></div>
+          </div>
+        </div>
+        <div id="card-slot" class="composer-wrap"></div>
+        <div class="composer-wrap" id="composer-wrap">
+          <div class="composer">
+            <textarea id="order" rows="1" placeholder="Tell Kairu what to do" aria-label="Your order" spellcheck="true"></textarea>
+            <div class="tools">
+              <button class="where" id="where" title="Which project this mission goes in">No project</button>
+              <span class="hint" id="hint">Enter sends · Shift+Enter new line · "stop" stops</span>
+              <span class="voice-line" id="voice-line" hidden></span>
+              <span class="grow"></span>
+              <button class="mic" id="mic" title="Mic (Ctrl+M)" aria-label="Mic" aria-pressed="false" hidden><svg class="icon" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></button>
+              <button class="send" id="send" title="Send" aria-label="Send"><svg class="icon" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+            </div>
+            <div class="picker" id="picker" hidden></div>
+          </div>
+          <div class="error" id="error" role="alert"></div>
+        </div>
+      </div>
+      <aside class="panel" id="panel" aria-label="Progress"></aside>
+    </div>
+  </main>
+</div>
+<div class="toast" id="toast" role="status"></div>
+<div class="lost" id="lost" hidden>
+  <div>
+    <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><path class="tile" d="M2 0h18a12 12 0 0 1 12 12v18a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2z"/><rect class="ring" x="6.5" y="11" width="19" height="10" rx="5" stroke-width="2.6"/></svg>
+    <h2 id="lost-title">This window lost its key</h2>
+    <p class="muted" id="lost-text">Open the workspace again with <span class="kbd">kairu workspace</span>.</p>
+  </div>
+</div>
+<script nonce="{{NONCE}}">
+"use strict";
+(function () {
+  // The key for this start of the workspace arrives after the # (it never goes over the network) and is then hidden.
+  const fromAddress = new URLSearchParams(location.hash.slice(1)).get("key");
+  if (fromAddress) { sessionStorage.setItem("kairu-key", fromAddress); history.replaceState(null, "", location.pathname); }
+  const KEY = sessionStorage.getItem("kairu-key") || "";
+
+  const $ = (id) => document.getElementById(id);
+  const state = { view: { name: "home" }, overview: null, mission: null, messages: [], lastId: 0, expanded: new Set(),
+                  project: null, searching: "", searchResults: null, cardId: null, lost: false,
+                  wasRunning: false, doneUntil: 0, toldWhere: "", voiceMission: undefined };
+
+  // Everything shown is set with textContent: names, orders, answers, window titles and file names are data, never markup.
+  function el(tag, cls, text) {
+    const node = document.createElement(tag);
+    if (cls) node.className = cls;
+    if (text !== undefined && text !== null) node.textContent = String(text);
+    return node;
+  }
+  function svg(paths, cls) {
+    const ns = "http://www.w3.org/2000/svg";
+    const node = document.createElementNS(ns, "svg");
+    node.setAttribute("viewBox", "0 0 24 24");
+    node.setAttribute("class", cls || "icon");
+    for (const d of paths) { const p = document.createElementNS(ns, "path"); p.setAttribute("d", d); node.appendChild(p); }
+    return node;
+  }
+  function logo(cls) {
+    const ns = "http://www.w3.org/2000/svg";
+    const node = document.createElementNS(ns, "svg");
+    node.setAttribute("viewBox", "0 0 32 32"); node.setAttribute("class", "logo" + (cls ? " " + cls : ""));
+    const tile = document.createElementNS(ns, "path");
+    tile.setAttribute("class", "tile"); tile.setAttribute("d", "M2 0h18a12 12 0 0 1 12 12v18a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2z");
+    const ring = document.createElementNS(ns, "rect");
+    for (const [k, v] of [["class", "ring"], ["x", "6.5"], ["y", "11"], ["width", "19"], ["height", "10"], ["rx", "5"], ["stroke-width", "2.6"]]) ring.setAttribute(k, v);
+    node.append(tile, ring);
+    return node;
+  }
+  function listening(o) { const v = o && o.voice; return !!(v && v.enabled && (v.state === "starting" || (v.state === "on" && (v.session || v.heard)))); }
+  const ICON = { check: ["M5 12.5l4.5 4.5L19 7.5"], cross: ["M6 6l12 12M18 6 6 18"], spin: ["M12 3a9 9 0 1 0 9 9"], wait: ["M12 7v5l3 2"],
+                 chevron: ["M9 6l6 6-6 6"], plus: ["M12 5v14M5 12h14"], shield: ["M12 3 5 6v5c0 4.5 3 8.2 7 10 4-1.8 7-5.5 7-10V6z"],
+                 file: ["M7 3h7l5 5v13H7z", "M14 3v5h5"], folder: ["M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"],
+                 bin: ["M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"] };
+
+  function ago(seconds) {
+    const s = Math.max(0, Date.now() / 1000 - seconds);
+    if (s < 60) return "just now";
+    if (s < 3600) return Math.round(s / 60) + " min ago";
+    if (s < 86400) return Math.round(s / 3600) + " h ago";
+    if (s < 86400 * 7) return Math.round(s / 86400) + " d ago";
+    return new Date(seconds * 1000).toLocaleDateString();
+  }
+  function toast(text) { const t = $("toast"); t.textContent = text; t.classList.add("show"); clearTimeout(toast.timer); toast.timer = setTimeout(() => t.classList.remove("show"), 2600); }
+
+  async function api(path, body) {
+    const options = { method: body === undefined ? "GET" : "POST", headers: { "X-Kairu-Key": KEY }, cache: "no-store" };
+    if (body !== undefined) { options.headers["Content-Type"] = "application/json"; options.body = JSON.stringify(body); }
+    let reply;
+    try { reply = await fetch(path, options); } catch (problem) { showLost("The workspace isn't answering", "It may have ended. Open it again with kairu workspace."); throw problem; }
+    if (reply.status === 401) { showLost("This window lost its key", "Open the workspace again with kairu workspace."); throw new Error("key"); }
+    const data = await reply.json().catch(() => ({}));
+    if (!reply.ok) { const error = new Error(data.error || "That didn't work."); error.status = reply.status; throw error; }
+    return data;
+  }
+  function showLost(title, text) {
+    if (state.lost) return;
+    state.lost = true; $("lost-title").textContent = title; $("lost-text").textContent = text; $("lost").hidden = false;
+  }
+
+  // --- the sidebar ----------------------------------------------------------------------------------
+
+  function renderSide() {
+    const o = state.overview;
+    if (!o) return;
+    const list = $("side-list");
+    list.replaceChildren();
+    const running = o.run ? o.run.mission : null;
+    $("side-logo").classList.toggle("working", !!o.run);
+    $("side-logo").classList.toggle("listening", !o.run && listening(o));
+    $("project-count").textContent = o.projects.length ? String(o.projects.length) : "";
+    for (const item of document.querySelectorAll("[data-page]")) item.classList.toggle("on", state.view.name === item.dataset.page);
+
+    if (state.searchResults) {
+      list.append(el("div", "group", "Search results"));
+      if (!state.searchResults.length) list.append(el("div", "empty-side", "No missions have those words."));
+      for (const m of state.searchResults) list.append(missionRow(m, running, false));
+      return;
+    }
+    const projects = el("div", "group", "Projects");
+    const add = el("button", "", "+ New");
+    add.title = "New project"; add.addEventListener("click", () => openPage("new-project"));
+    projects.append(add);
+    list.append(projects);
+    if (!o.projects.length) list.append(el("div", "empty-side", "No projects yet."));
+    for (const p of o.projects) {
+      const row = el("button", "row project" + (state.view.name === "project" && state.view.id === p.id ? " on" : ""));
+      const open = state.expanded.has(p.id);
+      const chev = svg(ICON.chevron, "chev" + (open ? " open" : ""));
+      chev.addEventListener("click", (event) => { event.stopPropagation(); open ? state.expanded.delete(p.id) : state.expanded.add(p.id); renderSide(); });
+      row.append(chev, el("span", "label", p.name));
+      if (running && o.recent.some((m) => m.id === running && m.project === p.id)) row.append(el("span", "dot"));
+      row.addEventListener("click", () => openProject(p.id));
+      list.append(row);
+      if (open) {
+        const inside = o.recent.filter((m) => m.project === p.id);
+        if (!inside.length) list.append(el("div", "empty-side child", "No missions yet"));
+        for (const m of inside.slice(0, 12)) list.append(missionRow(m, running, true));
+      }
+    }
+    list.append(el("div", "group", "Recent"));
+    if (!o.recent.length) list.append(el("div", "empty-side", "Your missions appear here."));
+    for (const m of o.recent.slice(0, 25)) list.append(missionRow(m, running, false));
+  }
+  function missionRow(m, running, child) {
+    const row = el("button", "row" + (child ? " child" : "") + (state.view.name === "mission" && state.view.id === m.id ? " on" : ""));
+    row.append(el("span", "label", m.title));
+    if (running === m.id) row.append(el("span", "dot"));
+    row.title = m.title;
+    row.addEventListener("click", () => openMission(m.id));
+    return row;
+  }
+  function renderGuardian() {
+    const g = state.overview ? state.overview.guardian : { state: "down", text: "Checking Guardian" };
+    $("guardian-pill").className = "pill " + g.state;
+    $("guardian-text").textContent = g.state === "running" ? "Guardian on" : g.state === "safe" ? "Safe Mode" : "Guardian off";
+    $("guardian-pill").title = g.text;
+  }
+
+  // --- views ----------------------------------------------------------------------------------------
+
+  function setCrumb(parts) {
+    const crumb = $("crumb");
+    crumb.replaceChildren();
+    parts.forEach((part, index) => {
+      if (index) crumb.append(el("span", "", "/"));
+      if (part.go) { const b = el("button", "", part.text); b.addEventListener("click", part.go); crumb.append(b); }
+      else crumb.append(el("span", "title", part.text));
+    });
+  }
+  function showComposer(on) { $("composer-wrap").hidden = !on; }
+  function showPanel(on) {
+    $("body").classList.toggle("no-panel", !on);
+    $("panel-btn").classList.toggle("can", on);
+    if (!on) { $("body").classList.remove("panel-open"); $("panel-btn").classList.remove("on"); }
+  }
+
+  function render() {
+    renderSide(); renderGuardian(); renderVoice(); tellWhere();
+    const v = state.view.name;
+    if (v === "home") return renderHome();
+    if (v === "mission") return renderMission();
+    if (v === "project") return renderProject();
+    if (v === "projects") return renderProjects();
+    if (v === "new-project") return renderNewProject();
+    if (v === "guardian") return renderGuardianPage();
+    if (v === "clones") return renderClones();
+    if (v === "shadows") return renderShadows();
+    if (v === "devices") return renderDevices();
+    if (v === "settings") return renderSettings();
+  }
+
+  function renderHome() {
+    setCrumb([{ text: "New mission" }]);
+    showComposer(true); showPanel(false);
+    const view = $("view");
+    view.replaceChildren();
+    const hero = el("div", "hero");
+    const hour = new Date().getHours();
+    hero.append(logo(state.overview && state.overview.run ? "working" : ""),
+      el("h1", "", hour < 12 ? "Good morning, master" : hour < 17 ? "Good afternoon, master" : "Good evening, master"),
+      el("p", "", "What should Kairu do?"));
+    const chips = el("div", "chips");
+    for (const text of ["what's open?", "how much RAM is free?", "open Notepad and set volume to 30", "find pdfs from today", "google the weather in Hyderabad"]) {
+      const chip = el("button", "chip", text);
+      chip.addEventListener("click", () => { $("order").value = text; $("order").focus(); grow(); });
+      chips.append(chip);
+    }
+    hero.append(chips);
+    view.append(hero);
+    updateWhere();
+    renderCard();
+    $("order").focus();
+  }
+
+  function renderMission() {
+    const m = state.mission;
+    if (!m) return;
+    const crumbs = [];
+    if (m.project) crumbs.push({ text: m.project.name, go: () => openProject(m.project.id) });
+    crumbs.push({ text: m.mission.title });
+    setCrumb(crumbs);
+    showComposer(true); showPanel(true);
+    const view = $("view");
+    view.replaceChildren();
+    let steps = null;
+    for (const message of state.messages) {
+      if (message.who === "step") {
+        if (!steps) { steps = el("div", "steps-block"); view.append(steps); }
+        steps.append(stepLine(message.text, message.state === "done" ? "done" : "not", ""));
+        continue;
+      }
+      steps = null;
+      if (message.who === "you") {
+        const row = el("div", "msg you"); row.append(el("div", "bubble", message.text)); view.append(row);
+      } else {
+        const row = el("div", "msg kairu"); row.append(logo(), el("div", "text", message.text)); view.append(row);
+      }
+    }
+    const run = m.run;
+    if (run) {
+      const line = el("div", "working-line");
+      line.append(logo("working"));
+      const said = el("span", "", run.thinking ? "Thinking" : run.steps.length ? "Working" : "On it");
+      const dots = el("span", "dots"); dots.append(el("span"), el("span"), el("span"));
+      line.append(said, dots);
+      view.append(line);
+    }
+    renderPanel();
+    updateWhere();
+    renderCard();
+    keepAtBottom();
+  }
+
+  function stepLine(text, kind, detail) {
+    const row = el("div", "step " + kind);
+    const icon = kind === "done" ? ICON.check : kind === "not" ? ICON.cross : kind === "running" ? ICON.spin : ICON.wait;
+    row.append(svg(icon, "icon mark"));
+    const words = el("div", "");
+    words.append(el("div", "", text));
+    if (detail) words.append(el("div", "muted", detail));
+    row.append(words);
+    return row;
+  }
+
+  function renderPanel() {
+    const panel = $("panel");
+    panel.replaceChildren();
+    const m = state.mission;
+    if (!m) return;
+    const progress = el("section");
+    progress.append(el("h3", "", "Progress"));
+    const run = m.run;
+    if (run && run.steps.length) {
+      for (const step of run.steps) {
+        const kind = step.state === "done" ? "done" : step.state === "not done" ? "not" : step.state === "running" ? "running" : "waiting";
+        progress.append(stepLine(step.label, kind, kind === "not" ? step.text : ""));
+      }
+    } else if (run) {
+      progress.append(el("div", "muted", run.thinking ? "Kairu is thinking about it." : "Starting."));
+    } else {
+      progress.append(el("div", "muted", "Each step shows here while an order runs."));
+    }
+    panel.append(progress);
+
+    // Files (W2): what this mission's finished steps made, changed, opened or recycled, by the names the steps gave.
+    // Open and Show send the same order as typing it, so Guardian decides them.
+    const files = el("section");
+    files.append(el("h3", "", "Files"));
+    const made = m.files || [];
+    if (!made.length) files.append(el("div", "muted", "Files this mission makes, changes or opens show here. Try: make a file called notes.txt saying hello"));
+    for (const f of made) {
+      const folder = f.how === "moved into";
+      const row = el("div", "file");
+      row.append(svg(f.how === "recycled" ? ICON.bin : folder ? ICON.folder : ICON.file));
+      const what = el("div", "what");
+      const meta = el("div", "meta");
+      meta.append(el("span", "how", (f.how === "recycled" ? "In the Recycle Bin" : f.how[0].toUpperCase() + f.how.slice(1)) + " · " + ago(f.at)));
+      what.append(el("div", "name", f.name), meta);
+      what.title = f.name;
+      row.append(what);
+      if (f.how !== "recycled") {
+        const name = what.querySelector(".name");  // the name itself opens it too: the same order as Open
+        name.classList.add("link");
+        name.title = "Open " + f.name;
+        name.addEventListener("click", () => sendText("open the " + (folder ? "folder" : "file") + " \"" + f.name + "\""));
+        const open = el("button", "go", "Open");
+        open.title = "Open it (the same as typing: open the " + (folder ? "folder" : "file") + " \u201c" + f.name + "\u201d)";
+        open.addEventListener("click", () => sendText("open the " + (folder ? "folder" : "file") + " \"" + f.name + "\""));
+        const show = el("button", "go", "Show");
+        show.title = "Show it in its folder, in Explorer";
+        show.addEventListener("click", () => sendText("show \"" + f.name + "\" in its folder"));
+        meta.append(open, show);
+      }
+      files.append(row);
+    }
+    panel.append(files);
+
+    const needs = el("section");
+    needs.append(el("h3", "", "Needs you"));
+    needs.append(el("div", "muted", state.overview && state.overview.card ? "Guardian is waiting for your answer, just above the box you type in." : "Nothing. High steps ask for \"yes\" and your PIN, above the box you type in."));
+    panel.append(needs);
+
+    const about = el("section");
+    about.append(el("h3", "", "This mission"));
+    const info = (a, b) => { const r = el("div", "info-row"); r.append(el("span", "", a), el("span", "", b)); return r; };
+    about.append(info("Project", m.project ? m.project.name : "None"), info("Started", ago(m.mission.created)), info("Last used", ago(m.mission.updated)));
+    const buttons = el("div", "actions");
+    const rename = el("button", "btn", "Rename");
+    rename.addEventListener("click", async () => {
+      const title = prompt("A new title for this mission", m.mission.title);
+      if (title === null) return;
+      try { await api("/api/missions/" + m.mission.id, { title }); await refreshMission(true); await refresh(); } catch (error) { toast(error.message); }
+    });
+    const remove = el("button", "btn danger", "Delete");
+    remove.addEventListener("click", async () => {
+      if (!confirm("Delete this mission and everything said in it? This can't be undone.")) return;
+      try { await api("/api/missions/" + m.mission.id, { delete: true }); state.mission = null; openPage("home"); await refresh(); } catch (error) { toast(error.message); }
+    });
+    buttons.append(rename, remove);
+    about.append(buttons);
+    panel.append(about);
+  }
+
+  async function renderProject() {
+    const p = state.project;
+    if (!p) return;
+    setCrumb([{ text: "Projects", go: () => openPage("projects") }, { text: p.project.name }]);
+    showComposer(true); showPanel(false);
+    const view = $("view");
+    view.replaceChildren();
+    const name = el("input", "name-input");
+    name.value = p.project.name; name.setAttribute("aria-label", "Project name");
+    name.addEventListener("change", async () => {
+      try { await api("/api/projects/" + p.project.id, { name: name.value }); toast("Renamed"); await refresh(); await reloadProject(); } catch (error) { toast(error.message); name.value = p.project.name; }
+    });
+    view.append(name);
+    view.append(el("p", "page-sub", p.missions.length ? p.missions.length + (p.missions.length === 1 ? " mission" : " missions") : "No missions yet. Give Kairu an order below to start one in this project."));
+    view.append(el("div", "section-h", "Notes"));
+    const notes = el("textarea", "field");
+    notes.value = p.project.notes; notes.placeholder = "What this project is about, links, what's left to do. Only on this PC.";
+    notes.addEventListener("change", async () => { try { await api("/api/projects/" + p.project.id, { notes: notes.value }); toast("Notes saved"); } catch (error) { toast(error.message); } });
+    view.append(notes);
+    const actions = el("div", "actions");
+    const archive = el("button", "btn", p.project.archived ? "Bring back" : "Archive");
+    archive.addEventListener("click", async () => { try { await api("/api/projects/" + p.project.id, { archived: !p.project.archived }); await refresh(); await reloadProject(); } catch (error) { toast(error.message); } });
+    const remove = el("button", "btn danger", "Delete project");
+    remove.addEventListener("click", async () => {
+      if (!confirm("Delete this project? Its missions stay, under Recent, with no project.")) return;
+      try { await api("/api/projects/" + p.project.id, { delete: true }); openPage("projects"); await refresh(); } catch (error) { toast(error.message); }
+    });
+    actions.append(archive, remove);
+    view.append(actions);
+    if (p.missions.length) {
+      view.append(el("div", "section-h", "Missions"));
+      const list = el("div", "list");
+      for (const m of p.missions) {
+        const item = el("button", "item");
+        item.append(el("span", "", m.title), el("span", "when", ago(m.updated)));
+        item.addEventListener("click", () => openMission(m.id));
+        list.append(item);
+      }
+      view.append(list);
+    }
+    updateWhere();
+    renderCard();
+  }
+
+  function renderProjects() {
+    setCrumb([{ text: "Projects" }]);
+    showComposer(false); showPanel(false);
+    const view = $("view");
+    view.replaceChildren();
+    view.append(el("h1", "page-title", "Projects"), el("p", "page-sub", "Keep each piece of work and its missions together."));
+    const grid = el("div", "grid");
+    const add = el("button", "tile");
+    add.append(svg(ICON.plus), el("div", "name", "New project"), el("div", "notes", "A home for a hackathon, a college project, anything."));
+    add.addEventListener("click", () => openPage("new-project"));
+    grid.append(add);
+    for (const p of state.overview.projects) grid.append(projectTile(p));
+    view.append(grid);
+    if (state.overview.archived.length) {
+      view.append(el("div", "section-h", "Archived"));
+      const archived = el("div", "grid");
+      for (const p of state.overview.archived) archived.append(projectTile(p));
+      view.append(archived);
+    }
+  }
+  function projectTile(p) {
+    const tile = el("button", "tile");
+    tile.append(el("div", "name", p.name));
+    if (p.notes) tile.append(el("div", "notes", p.notes));
+    tile.append(el("div", "meta", (p.missions === 1 ? "1 mission" : p.missions + " missions") + " · " + ago(p.updated)));
+    tile.addEventListener("click", () => openProject(p.id));
+    return tile;
+  }
+
+  function renderNewProject() {
+    setCrumb([{ text: "Projects", go: () => openPage("projects") }, { text: "New project" }]);
+    showComposer(false); showPanel(false);
+    const view = $("view");
+    view.replaceChildren();
+    view.append(el("h1", "page-title", "New project"), el("p", "page-sub", "Give it a name. You can add notes and missions next."));
+    const name = el("input", "field");
+    name.placeholder = "Google Buildathon"; name.setAttribute("aria-label", "Project name"); name.maxLength = 80;
+    const notes = el("textarea", "field");
+    notes.placeholder = "What it's about (optional)";
+    notes.setAttribute("aria-label", "Notes");
+    const error = el("div", "error");
+    const make = el("button", "btn primary", "Create project");
+    const create = async () => {
+      if (!name.value.trim()) { error.textContent = "Type a name first."; name.focus(); return; }
+      try { const made = await api("/api/projects", { name: name.value, notes: notes.value }); await refresh(); openProject(made.project.id); }
+      catch (problem) { error.textContent = problem.message; }
+    };
+    make.addEventListener("click", create);
+    name.addEventListener("keydown", (event) => { if (event.key === "Enter") create(); });
+    name.addEventListener("input", () => { error.textContent = ""; });
+    const gap = el("div", ""); gap.className = "section-h";
+    const actions = el("div", "actions"); actions.append(make);
+    view.append(name, gap, notes, error, actions);
+    name.focus();
+  }
+
+  async function renderGuardianPage() {
+    setCrumb([{ text: "Guardian" }]);
+    showComposer(false); showPanel(false);
+    const view = $("view");
+    view.replaceChildren();
+    view.append(el("h1", "page-title", "Guardian"), el("p", "page-sub", "Kairu's safety boss. It decides every step, and its monitors watch and warn. They never act."));
+    let data;
+    try { data = await api("/api/protection"); } catch (error) { view.append(el("p", "error", error.message)); return; }
+    if (state.view.name !== "guardian") return;
+    const status = el("div", "list");
+    const row = el("div", "item");
+    const pill = el("span", "pill " + data.guardian.state); pill.append(el("span", "light"), el("span", "", data.guardian.text));
+    row.append(pill);
+    if (data.guardian.state === "safe") row.append(el("span", "when", "Resume with kairu resume"));
+    if (data.guardian.state === "down") row.append(el("span", "when", "Start it with kairu guardian run"));
+    status.append(row);
+    view.append(status);
+    view.append(el("div", "section-h", "How it decides"));
+    const tiers = el("div", "grid");
+    for (const [name, text] of [["Low and Medium", "Run on their own, inside their limits."], ["High", "Waits for \"yes\" and your PIN. Voice can never approve."], ["Critical", "Always blocked: money, security settings, deleting accounts, hidden installs."], ["Stop", "Ctrl+Alt+K, the red Stop or \"Kairu, stop\" ends everything within a second."]]) {
+      const tile = el("div", "tile"); tile.append(el("div", "name", name), el("div", "notes full", text)); tiers.append(tile);
+    }
+    view.append(tiers);
+    view.append(el("div", "section-h", "Open alerts"));
+    if (!data.alerts.length) view.append(el("div", "note", "No open alerts. Gmail, Downloads, new devices and Windows Security are watched while Guardian runs."));
+    else {
+      const list = el("div", "list");
+      for (const a of data.alerts) {
+        const item = el("div", "item");
+        item.append(el("span", "sev " + a.severity, a.severity), el("span", "", a.title), el("span", "when", new Date(a.created).toLocaleString()));
+        list.append(item);
+      }
+      view.append(list);
+      view.append(el("p", "muted", "Close an alert with kairu alerts close <number>."));
+    }
+    if (data.deadlines.length) {
+      view.append(el("div", "section-h", "Deadlines"));
+      const list = el("div", "list");
+      for (const d of data.deadlines) { const item = el("div", "item"); item.append(el("span", "", d.title), el("span", "when", d.due)); list.append(item); }
+      view.append(list);
+    }
+  }
+
+  function renderGrowth(view, g) {  // what each Clone's tasks delivered: tasks, not people; no score, no ranking
+    if (!g || !g.people || !g.people.some(r => r.delivered || r.open)) return;
+    view.append(el("div", "section-h", "Growth record"), el("p", "muted", "What each Clone's tasks delivered (no score, no ranking). Each entry also reaches that person's laptop with their next order."));
+    const list = el("div", "list team-feed");
+    for (const r of g.people) {
+      const row = el("div", "item");
+      let words = r.delivered + " delivered (" + r.early + " early, " + r["on time"] + " on time, " + r.late + " after plan)";
+      if (r.unblocked) words += " · " + r.unblocked + " let other tasks start";
+      if (r.stepped_in) words += " · " + r.stepped_in + " finished after a block";
+      if (r.checked) words += " · " + r.checked + " checked by you";
+      if (r.pending) words += " · " + r.pending + " waiting to reach their laptop";
+      row.append(el("span", "who", r.clone), el("span", "", words));
+      list.append(row);
+    }
+    view.append(list);
+    if ((g.suggestions || []).length) {
+      view.append(el("div", "section-h", "Suggestions for you to decide"));
+      const ideas = el("div", "list team-feed");
+      for (const i of g.suggestions) { const row = el("div", "item"); row.append(el("span", "who", i.clone), el("span", "", i.offer + " (" + i.evidence + "). kairu team offer " + i.clone + " \"" + i.offer + "\"")); ideas.append(row); }
+      view.append(ideas, el("p", "muted", "Kairu never assigns or promotes: you decide, and the person accepts or declines on their own laptop."));
+    }
+    if ((g.offers || []).length) {
+      const offers = el("div", "list team-feed");
+      for (const o of g.offers.slice().reverse()) { const row = el("div", "item"); row.append(el("span", "who", "#" + o.number + " " + o.clone), el("span", "", o.words + " (" + o.state + ")")); offers.append(row); }
+      view.append(el("div", "section-h", "Offers"), offers);
+    }
+  }
+
+  async function renderClones() {
+    setCrumb([{ text: "Clones" }]);
+    showComposer(false); showPanel(false);
+    const view = $("view");
+    let data;
+    try { data = await api("/api/team" + (state.teamProject ? "?project=" + state.teamProject : "")); } catch (error) { view.replaceChildren(el("p", "error", error.message)); return; }
+    if (state.view.name !== "clones") return;
+    view.replaceChildren();
+    view.append(el("h1", "page-title", "Clones"), el("p", "page-sub", "Main Kairu splits a project; each Clone does its part on its own laptop, every step decided by that laptop's Guardian."));
+    const team = el("div", "grid");
+    const me = el("div", "tile"); me.append(el("div", "name", "Main Kairu"), el("div", "notes", "This PC. Plans the work and hands it on."), el("div", "meta", "lead"));
+    team.append(me);
+    for (const c of data.clones) {
+      const t = el("div", "tile");
+      const load = data.project && (data.project.workload || []).find(w => w.clone === c.name);
+      t.append(el("div", "name", c.name), el("div", "notes", "Share " + c.share + (c.share === 1 ? " (even)" : "") + (c.skills ? " · " + c.skills : "")),
+               el("div", "meta" + (c.quiet ? " warn" : ""), c.seen ? "heard from " + ago(c.seen) : "not heard from yet"));
+      if (load) t.append(el("div", "meta" + (load.slipping ? " warn" : ""), load.done + "/" + load.tasks + " tasks · ~" + load.minutes_left + " min left" + (load.working_on ? " · on task " + load.working_on : "")));
+      team.append(t);
+    }
+    view.append(team);
+    if (!data.clones.length && (data.inbox || []).length) {  // a Clone's laptop: Main Kairu's notes to it
+      view.append(el("div", "section-h", "From Main Kairu"));
+      const inbox = el("div", "list team-feed");
+      for (const n of data.inbox.slice().reverse()) { const row = el("div", "item"); row.append(el("span", "when", clock(n.time)), el("span", "", " " + n.words)); inbox.append(row); }
+      view.append(inbox, el("p", "muted", "Tell Main Kairu's board something with kairu team say \"WORDS\"."));
+    }
+    if (!data.clones.length) view.append(el("div", "section-h", " "), el("div", "note", "No Clones yet. On the other laptop run kairu team join NAME; here run the kairu team add line it shows (yes and your PIN)."));
+    const p = data.project;
+    if (!p) {
+      view.append(el("div", "section-h", "Projects"), el("div", "note", "No project yet. Split one with kairu team split \"the project brief\" --hours 6, then kairu team start."));
+      teamTimer();
+      return;
+    }
+    view.append(el("div", "section-h", "Project " + p.number + ": " + p.name));
+    const head = el("div", "team-head");
+    const bar = el("div", "team-bar" + (p.at_risk ? " risk" : "")); const fill = el("div", "fill"); fill.style.width = p.progress + "%"; bar.append(fill);
+    const facts = el("div", "team-facts");
+    facts.append(el("span", "big", p.progress + "%"), el("span", "", p.done + " of " + p.tasks_total + " tasks done"),
+                 el("span", "", "state: " + p.state),
+                 el("span", p.at_risk ? "risk-text" : "", p.deadline ? "deadline " + clock(p.deadline) + (p.at_risk ? " (at risk: expected " + clock(p.projected_end) + ")" : " (on track)") : "no deadline"));
+    if (p.slipping) facts.append(el("span", "risk-text", p.slipping + " slipping"));
+    head.append(bar);
+    if (p.time_used !== null && p.time_used !== undefined) {  // the deadline bar: time used under work done
+      const behind = p.state !== "done" && p.time_used > p.progress + 10;
+      const tbar = el("div", "team-bar time" + (behind ? " behind" : "")); const tfill = el("div", "fill"); tfill.style.width = p.time_used + "%"; tbar.append(tfill);
+      head.append(tbar);
+      facts.append(el("span", behind ? "risk-text" : "", "time used " + p.time_used + "%" + (behind ? " (behind)" : "")));
+    }
+    head.append(facts);
+    view.append(head);
+    const list = el("div", "list");
+    const marks = { done: "✓", working: "▶", waiting: "·", blocked: "!" };
+    for (const t of p.tasks) {
+      const row = el("div", "item team-task" + (t.slipping ? " slip" : ""));
+      const left = el("div", "team-left");
+      left.append(el("span", "chip " + t.state, (marks[t.state] || "?") + " " + t.state));
+      const mid = el("div", "team-mid");
+      mid.append(el("div", "t", t.number + ". " + t.title), el("div", "muted", t.clone + " · " + t.step + "/" + t.orders.length + " orders · done when: " + t.done_check));
+      if (t.last) mid.append(el("div", "last", t.last));
+      if (t.silent) mid.append(el("div", "last risk-text", "No word from " + t.clone + " for a while."));
+      const right = el("span", "when", t.slipping ? "slipping" : (t.state === "done" ? "done" : "due " + clock(t.planned_end)));
+      if (t.slipping) right.classList.add("risk-text");
+      row.append(left, mid, right);
+      list.append(row);
+    }
+    view.append(list);
+    if ((p.feed || []).length) {  // Main Kairu's notes and what the Clones said: text only
+      view.append(el("div", "section-h", "Team feed"));
+      const feed = el("div", "list team-feed");
+      for (const f of p.feed.slice(-12).reverse()) {
+        const row = el("div", "item");
+        row.append(el("span", "when", clock(f.time)), el("span", "who", " " + f.who + (f.whom ? " → " + f.whom : "")), el("span", "", f.words));
+        feed.append(row);
+      }
+      view.append(feed);
+    }
+    renderGrowth(view, data.growth);
+    if (data.projects.length > 1) {
+      const others = el("div", "actions");
+      for (const q of data.projects.slice(0, 6)) { const b = el("button", "btn" + (q.number === p.number ? " primary" : ""), q.number + ". " + q.name); b.addEventListener("click", () => { state.teamProject = q.number; renderClones(); }); others.append(b); }
+      view.append(el("div", "section-h", "Other projects"), others);
+    }
+    view.append(el("p", "muted", "Start or go on with kairu team start " + p.number + " (or say \"start the project\"); ask \"how's the project going?\" any time. kairu stop ends it with everything else. High steps wait on each Clone for that laptop's PIN."));
+    teamTimer();
+  }
+  function clock(t) { const d = new Date(t * 1000); return d.toLocaleString([], { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }); }
+  function teamTimer() { clearTimeout(teamTimer.t); teamTimer.t = setTimeout(() => { if (state.view.name === "clones") renderClones(); }, 3000); }
+
+  function renderShadows() {
+    setCrumb([{ text: "Shadows" }]);
+    showComposer(false); showPanel(false);
+    const view = $("view");
+    view.replaceChildren();
+    view.append(el("h1", "page-title", "Shadows"), el("p", "page-sub", "Temporary helpers: Kairu helps a friend on their PC while you keep Main Kairu."));
+    const how = el("div", "compare");
+    const a = el("div", "tile"); a.append(el("div", "name", "How a Shadow works"));
+    const ul = el("ul");
+    for (const t of ["You start it; your friend allows it", "It works in the one folder your friend shares, and your friend can stop it", "It comes back when the work is done, or at once when you say come back", "It takes none of your private data and leaves nothing behind"]) ul.append(el("li", "", t));
+    a.append(ul);
+    const b = el("div", "tile"); b.append(el("div", "name", "Out now"), el("div", "notes", "No Shadows are out. Each one will show here with its progress and a Come back now button."));
+    how.append(a, b);
+    view.append(how);
+    view.append(el("div", "section-h", " "), el("div", "note", "Planned for Phase H. A Shadow has its own empty workspace, never yours, and keeps working even when your PC is off."));
+  }
+
+  async function renderDevices() {
+    setCrumb([{ text: "Devices" }]);
+    showComposer(false); showPanel(false);
+    const view = $("view");
+    view.replaceChildren();
+    view.append(el("h1", "page-title", "Devices"), el("p", "page-sub", "Phones paired with Kairu Link. Their messages are only requests: Guardian decides each one."));
+    let data;
+    try { data = await api("/api/devices"); } catch (error) { view.append(el("p", "error", error.message)); return; }
+    if (state.view.name !== "devices") return;
+    const list = el("div", "list");
+    const pc = el("div", "item"); pc.append(el("span", "", "This PC (Main Kairu)"), el("span", "when", "here"));
+    list.append(pc);
+    for (const d of data.devices) { const item = el("div", "item"); item.append(el("span", "", d.name), el("span", "when", d.seen ? "seen " + ago(d.seen) : "paired " + ago(d.paired))); list.append(item); }
+    view.append(list);
+    if (!data.devices.length) view.append(el("p", "muted", "No phone paired yet. Pair one with kairu device pair (LINK.md)."));
+  }
+
+  function renderSettings() {
+    setCrumb([{ text: "Settings" }]);
+    showComposer(false); showPanel(false);
+    const view = $("view");
+    view.replaceChildren();
+    view.append(el("h1", "page-title", "Settings"), el("p", "page-sub", "Kairu's settings live in config.yaml, and only you change them there. This window can't."));
+    const list = el("div", "list");
+    for (const [a, b] of [["Emergency stop", "Ctrl+Alt+K"], ["Show or hide the Kairu bar", "Ctrl+Alt+ your bar key"], ["Start listening in the bar", "Ctrl+Alt+V"], ["The mic in this window", "Ctrl+M"], ["Open this workspace", "kairu workspace, or \"open the workspace\" in the bar"], ["End this workspace", "kairu workspace quit"], ["Leave Safe Mode", "kairu resume"]]) {
+      const item = el("div", "item"); item.append(el("span", "", a), el("span", "when kbd", b)); list.append(item);
+    }
+    view.append(list);
+    view.append(el("div", "section-h", "Where your workspace is kept"), el("div", "note", "Projects, missions and messages stay in data/workspace.db on this PC. They never go into Guardian's log and are never sent anywhere."));
+  }
+
+  // --- the card: only your own typing fills it --------------------------------------------------------
+
+  function renderCard() {
+    const slot = $("card-slot");
+    const card = state.overview ? state.overview.card : null;  // the one card, whichever mission asked for it
+    if (!card) { if (state.cardId) { slot.replaceChildren(); state.cardId = null; } return; }
+    if (state.cardId === card.id) { const t = slot.querySelector(".time"); if (t) t.textContent = card.seconds_left + " s left"; return; }
+    state.cardId = card.id;
+    slot.replaceChildren();
+    const box = el("div", "card");
+    const heading = el("h4"); heading.append(svg(ICON.shield), el("span", "", card.heading));
+    const lines = el("div", "lines");
+    for (const line of card.lines) lines.append(el("div", "", line));
+    const answer = el("div", "answer");
+    const yesLabel = el("label", "", 'Type "yes"');
+    const yesBox = el("input");
+    yesBox.type = "text"; yesBox.autocomplete = "off"; yesBox.spellcheck = false; yesBox.setAttribute("aria-label", 'Type "yes"');
+    yesLabel.append(yesBox);
+    answer.append(yesLabel);
+    let pinBox = null;
+    if (card.with_pin) {
+      const pinLabel = el("label", "", "PIN");
+      pinBox = el("input", "pin");
+      pinBox.type = "text"; pinBox.autocomplete = "off"; pinBox.inputMode = "numeric"; pinBox.spellcheck = false; pinBox.setAttribute("aria-label", "Your PIN");
+      pinLabel.append(pinBox);
+      answer.append(pinLabel);
+    }
+    const goOn = el("button", "btn primary", "Go on");
+    const refuse = el("button", "btn", "Refuse");
+    answer.append(goOn, refuse, el("span", "time", card.seconds_left + " s left"));
+    const send = async (go) => {
+      const yes = go ? yesBox.value : "";
+      const pin = go && pinBox ? pinBox.value : "";
+      yesBox.value = "";
+      if (pinBox) pinBox.value = "";
+      slot.replaceChildren();
+      try { await api("/api/answer", { card: card.id, go_on: go, yes: yes, pin: pin }); }
+      catch (error) { toast(error.status === 409 ? "That card had already closed." : error.message); }
+      refreshSoon();
+    };
+    goOn.addEventListener("click", () => send(true));
+    refuse.addEventListener("click", () => send(false));
+    yesBox.addEventListener("keydown", (event) => { if (event.key === "Enter") { if (pinBox) pinBox.focus(); else send(true); } });
+    if (pinBox) pinBox.addEventListener("keydown", (event) => { if (event.key === "Enter") send(true); });
+    box.append(heading, lines, answer);
+    slot.append(box);
+    yesBox.focus();
+  }
+
+  // --- the composer ---------------------------------------------------------------------------------
+
+  function targetProject() {
+    if (state.view.name === "project" && state.project) return state.project.project.id;
+    if (state.view.name === "home") return state.homeProject || null;
+    return null;
+  }
+  function updateWhere() {
+    const where = $("where");
+    if (state.view.name === "mission" && state.mission) {
+      where.textContent = state.mission.project ? "In " + state.mission.project.name : "No project";
+    } else {
+      const id = targetProject();
+      const p = id && state.overview ? state.overview.projects.find((x) => x.id === id) : null;
+      where.textContent = p ? "New mission in " + p.name : "No project";
+    }
+    tellWhere();
+  }
+  function togglePicker() {
+    const picker = $("picker");
+    if (!picker.hidden) { picker.hidden = true; return; }
+    picker.replaceChildren();
+    const current = state.view.name === "mission" && state.mission ? (state.mission.project ? state.mission.project.id : null) : targetProject();
+    const choose = async (id) => {
+      picker.hidden = true;
+      if (state.view.name === "mission" && state.mission) {
+        try { await api("/api/missions/" + state.mission.mission.id, { project: id === null ? "" : id }); await refreshMission(true); await refresh(); toast(id === null ? "Moved out of its project" : "Moved"); }
+        catch (error) { toast(error.message); }
+      } else if (state.view.name === "home") { state.homeProject = id; updateWhere(); }
+      else if (state.view.name === "project") { if (id === null) { state.homeProject = null; openPage("home"); } else openProject(id); }
+    };
+    const none = el("button", current === null ? "on" : "", "No project");
+    none.addEventListener("click", () => choose(null));
+    picker.append(none);
+    for (const p of state.overview.projects) {
+      const b = el("button", current === p.id ? "on" : "", p.name);
+      b.addEventListener("click", () => choose(p.id));
+      picker.append(b);
+    }
+    picker.hidden = false;
+  }
+  function grow() { const t = $("order"); t.style.height = "auto"; t.style.height = Math.min(200, t.scrollHeight) + "px"; }
+  async function sendOrder() {
+    const box = $("order");
+    const text = box.value.trim();
+    $("error").textContent = "";
+    if (!text) { $("error").textContent = "Type an order first."; box.focus(); return; }
+    const body = { text };
+    if (state.view.name === "mission" && state.mission) body.mission = state.mission.mission.id;
+    else { const p = targetProject(); if (p !== null) body.project = p; }
+    try {
+      const reply = await api("/api/order", body);
+      box.value = ""; grow();
+      if (reply.stopped) { toast(reply.stopped); await refresh(); return; }
+      await refresh();
+      if (!state.mission || state.mission.mission.id !== reply.mission) await openMission(reply.mission);
+      else await refreshMission(true);
+    } catch (error) { $("error").textContent = error.message; }
+  }
+
+  async function sendText(text) {
+    if (!state.mission) return;
+    try { await api("/api/order", { mission: state.mission.mission.id, text }); await refreshMission(true); await refresh(); }
+    catch (error) { toast(error.message); }
+  }
+
+  // --- the voice (W2): only your own click on the mic or your own Ctrl+M switches it on ---------------------
+
+  async function micPressed(how) {
+    try { const r = await api("/api/mic", { how }); state.overview.voice = r.voice; renderVoice(); } catch (error) { toast(error.message); }
+    refreshSoon();
+  }
+  function tellWhere() {
+    const v = state.overview && state.overview.voice;
+    if (!v || !v.enabled) return;
+    const mission = state.view.name === "mission" && state.mission ? state.mission.mission.id : null;
+    const project = mission === null ? targetProject() : null;
+    const where = JSON.stringify([mission, project]);
+    if (where === state.toldWhere) return;
+    state.toldWhere = where;
+    api("/api/voice-where", { mission, project }).catch(() => { state.toldWhere = ""; });
+  }
+  function renderVoice() {
+    const o = state.overview;
+    if (!o) return;
+    const v = o.voice || { enabled: false };
+    const mic = $("mic");
+    mic.hidden = !v.enabled;
+    if (v.enabled) {
+      mic.className = "mic" + (v.state === "on" ? " on" : v.state === "starting" ? " starting" : "");
+      mic.setAttribute("aria-pressed", v.state === "off" ? "false" : "true");
+      mic.title = v.state === "off" ? "Mic off: click (or Ctrl+M) to switch it on" : "Mic on: click to switch it off";
+    }
+    const line = v.enabled && v.state !== "off" ? (v.line || "") : "";
+    $("voice-line").hidden = !line; $("voice-line").textContent = line;
+    $("hint").hidden = !!line;
+    renderGlass();
+  }
+  function renderGlass() {
+    const o = state.overview;
+    const v = (o && o.voice) || { enabled: false };
+    const run = o ? o.run : null;
+    const now = Date.now();
+    if (state.wasRunning && !run) state.doneUntil = now + 2500;
+    state.wasRunning = !!run;
+    let mode = "", said = "", end = null;
+    if (run) {
+      mode = "work";
+      const steps = run.steps || [];
+      const current = steps.find((s) => s.state === "running") || steps.find((s) => s.state === "waiting");
+      said = run.thinking ? "Thinking" : current ? current.label : steps.length ? "Finishing" : "On it";
+      const finished = steps.filter((s) => s.state === "done" || s.state === "not done").length;
+      if (steps.length) end = el("span", "pct", Math.round(100 * finished / steps.length) + "%");
+    } else if (v.enabled && v.state === "starting") {
+      mode = "listen"; said = "Starting the mic…";
+    } else if (v.enabled && v.state === "on" && (v.session || v.heard)) {
+      mode = "listen"; said = v.heard || "Listening…";
+      end = el("span", "wave"); end.append(el("span"), el("span"), el("span"), el("span"));
+    } else if (now < state.doneUntil) {
+      mode = "done"; said = "Done";
+      end = svg(["M4 12.5l4.5 4.5L20 6.5"], "tick");
+    }
+    $("glass-slot").hidden = !mode || $("composer-wrap").hidden;
+    if (!mode) return;
+    $("glass").dataset.mode = mode;
+    $("glass-said").textContent = said;
+    const holder = $("glass-end");
+    holder.replaceChildren();
+    if (end) holder.append(end);
+    if (mode === "done") { holder.replaceChildren(); $("glass-said").before(holder); holder.append(end); }
+    else if (holder.nextSibling === $("glass-said")) $("glass-said").after(holder);
+  }
+  function followVoice() {
+    // a spoken order made a new mission: the window opens it, if you were on the home page or in the voice's last mission
+    const v = state.overview && state.overview.voice;
+    if (!v || !v.enabled) return;
+    const before = state.voiceMission;
+    state.voiceMission = v.mission;
+    if (before === undefined || v.mission === null || v.mission === before) return;
+    if (state.view.name === "mission" && state.view.id === v.mission) return;
+    if (state.view.name === "home" || state.view.name === "project" || (state.view.name === "mission" && state.view.id === before)) openMission(v.mission);
+  }
+
+  // --- moving around ----------------------------------------------------------------------------------
+
+  function openPage(name) {
+    state.view = { name }; state.mission = null; state.project = null; $("picker").hidden = true; $("error").textContent = "";
+    if (name !== "mission") $("panel").replaceChildren();
+    render();
+  }
+  async function openMission(id) {
+    try {
+      const data = await api("/api/missions/" + id);
+      state.view = { name: "mission", id }; state.mission = data; state.messages = data.messages;
+      state.lastId = data.messages.length ? data.messages[data.messages.length - 1].id : 0;
+      state.project = null; $("picker").hidden = true; $("error").textContent = "";
+      if (data.mission.project) state.expanded.add(data.mission.project);
+      render();
+      $("order").focus();
+    } catch (error) { toast(error.message); }
+  }
+  async function openProject(id) {
+    try {
+      const data = await api("/api/projects/" + id);
+      state.view = { name: "project", id }; state.project = data; state.mission = null; $("picker").hidden = true; $("error").textContent = "";
+      state.expanded.add(id);
+      render();
+    } catch (error) { toast(error.message); }
+  }
+  async function reloadProject() { if (state.view.name === "project") await openProject(state.view.id); }
+  function keepAtBottom() { const s = $("scroll"); if (s.scrollHeight - s.scrollTop - s.clientHeight < 200 || keepAtBottom.force) s.scrollTop = s.scrollHeight; keepAtBottom.force = false; }
+
+  // --- staying up to date -------------------------------------------------------------------------------
+
+  async function refresh() {
+    try { state.overview = await api("/api/state"); } catch (error) { return; }
+    renderSide(); renderGuardian(); renderVoice(); followVoice();
+    renderCard();
+    const asking = !!state.overview.card;
+    if (state.view.name === "mission" && asking !== state.panelAsking) renderPanel();
+    state.panelAsking = asking;
+    if (state.view.name === "home") updateWhere();
+  }
+  async function refreshMission(force) {
+    if (state.view.name !== "mission" || !state.mission) return;
+    const id = state.mission.mission.id;
+    let data;
+    try { data = await api("/api/missions/" + id + "?after=" + state.lastId); } catch (error) { return; }
+    if (state.view.name !== "mission" || state.view.id !== id) return;
+    const changed = force || data.messages.length || JSON.stringify(data.run) !== JSON.stringify(state.mission.run)
+      || JSON.stringify(data.mission) !== JSON.stringify(state.mission.mission) || (data.card ? data.card.id : null) !== (state.mission.card ? state.mission.card.id : null)
+      || JSON.stringify(data.files) !== JSON.stringify(state.mission.files);
+    if (data.messages.length) { state.messages = state.messages.concat(data.messages); state.lastId = data.messages[data.messages.length - 1].id; keepAtBottom.force = true; }
+    state.mission = data;
+    if (changed) renderMission(); else renderCard();
+  }
+  function refreshSoon() { setTimeout(() => { refresh(); refreshMission(true); }, 150); }
+
+  let ticks = 0;
+  async function tick() {
+    if (state.lost) return;
+    ticks += 1;
+    const o = state.overview;
+    const busy = o && o.run;
+    const hearing = o && o.voice && o.voice.enabled && o.voice.state !== "off";
+    if (state.view.name === "mission") await refreshMission(false);
+    if (busy || hearing || ticks % 3 === 0 || Date.now() < state.doneUntil + 1000) await refresh();
+    else renderGlass();
+    setTimeout(tick, hearing ? 350 : busy ? 600 : 1000);
+  }
+
+  // --- wiring -----------------------------------------------------------------------------------------
+
+  $("new-mission").addEventListener("click", () => { state.homeProject = null; openPage("home"); });
+  for (const item of document.querySelectorAll("[data-page]")) item.addEventListener("click", () => openPage(item.dataset.page));
+  $("send").addEventListener("click", sendOrder);
+  $("mic").addEventListener("click", () => micPressed("button"));
+  $("panel-btn").addEventListener("click", () => { const open = $("body").classList.toggle("panel-open"); $("panel-btn").classList.toggle("on", open); });
+  $("where").addEventListener("click", togglePicker);
+  $("order").addEventListener("input", () => { grow(); $("error").textContent = ""; });
+  $("order").addEventListener("keydown", (event) => { if (event.key === "Enter" && !event.shiftKey && !event.isComposing) { event.preventDefault(); sendOrder(); } });
+  $("stop").addEventListener("click", async () => { try { const r = await api("/api/stop", {}); toast(r.text); } catch (error) { toast(error.message); } refreshSoon(); });
+  $("close-side").addEventListener("click", () => { $("app").classList.add("side-closed"); $("open-side").hidden = false; });
+  $("open-side").addEventListener("click", () => { $("app").classList.remove("side-closed"); $("open-side").hidden = true; });
+  let searchTimer = null;
+  $("search").addEventListener("input", () => {
+    clearTimeout(searchTimer);
+    const words = $("search").value.trim();
+    if (!words) { state.searchResults = null; renderSide(); return; }
+    searchTimer = setTimeout(async () => { try { state.searchResults = (await api("/api/search?q=" + encodeURIComponent(words))).missions; renderSide(); } catch (error) { /* shown by api() */ } }, 200);
+  });
+  document.addEventListener("keydown", (event) => {
+    if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === "k") { event.preventDefault(); $("search").focus(); }
+    if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "o") { event.preventDefault(); state.homeProject = null; openPage("home"); }
+    if (event.ctrlKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "m" && state.overview && state.overview.voice && state.overview.voice.enabled) { event.preventDefault(); micPressed("key"); }
+  });
+
+  if (!KEY) { showLost("This window has no key", "Open the workspace with kairu workspace."); return; }
+  refresh().then(() => { render(); tick(); });
+})();
+</script>
+</body>
+</html>

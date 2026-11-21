@@ -1,0 +1,18 @@
+# The recorded test sounds in this folder, made with Windows' own voices by make.ps1 (16 kHz, 16-bit, mono).
+# name|voice|what is said (SSML; "Kairu" is said as /ˈkaɪruː/)
+kairu|Microsoft Zira Desktop|<phoneme alphabet="ipa" ph="ˈkaɪruː">Kairu</phoneme>.
+kairu_open_chrome_and_volume|Microsoft Zira Desktop|<phoneme alphabet="ipa" ph="ˈkaɪruː">Kairu</phoneme>, open Chrome and set volume to thirty.
+no_kairu|Microsoft David Desktop|The weather was lovely today, so we walked to the market and bought some fruit.
+kairu_stop|Microsoft Zira Desktop|<phoneme alphabet="ipa" ph="ˈkaɪruː">Kairu</phoneme>, stop.
+thank_you|Microsoft Zira Desktop|Thank you.
+kairu_filler|Microsoft Zira Desktop|<phoneme alphabet="ipa" ph="ˈkaɪruː">Kairu</phoneme>, um, okay so, open Notepad.
+yes|Microsoft Zira Desktop|Yes.
+pin|Microsoft Zira Desktop|four, eight, two, nine, one, six.
+kairu_restart|Microsoft Zira Desktop|<phoneme alphabet="ipa" ph="ˈkaɪruː">Kairu</phoneme>, restart.
+kairu_search_weather|Microsoft Zira Desktop|<phoneme alphabet="ipa" ph="ˈkaɪruː">Kairu</phoneme>, search the weather.
+kairus_own_voice|Microsoft David Desktop|Go ahead. <phoneme alphabet="ipa" ph="ˈkaɪruː">Kairu</phoneme>, open Notepad.
+kairu_open|Microsoft Zira Desktop|<phoneme alphabet="ipa" ph="ˈkaɪruː">Kairu</phoneme>, open.
+open_notepad|Microsoft Zira Desktop|Open Notepad.
+set_volume_twenty|Microsoft Zira Desktop|Set volume to twenty.
+kairu_two_breaths|Microsoft Zira Desktop|<phoneme alphabet="ipa" ph="ˈkaɪruː">Kairu</phoneme>, open Notepad. <break time="1500ms"/> Set volume to twenty.
+someone_else|Microsoft Mark|<phoneme alphabet="ipa" ph="ˈkaɪruː">Kairu</phoneme>, open Notepad.
