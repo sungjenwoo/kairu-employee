@@ -18,7 +18,7 @@ Clones (Main Kairu splits a project across Kairus on teammates' laptops; each Cl
 The Builder (sites, apps, slides and tests; Forge writes its own skills; Five Paths, the best of five plans): BUILDER.md.
 Kairu's eyes, the screen agent ("take control and ...": see, think, act, see again, with Gemini): BAR.md "Kairu's eyes".
 Kairu Live in the bar (LiveKit hears, Groq thinks, ElevenLabs speaks; the bar, the task core and Guardian act): VOICE.md "Kairu Live".
-The hackathon meeting agent (stage 1 "Meeting in" built, ADR-055 proposed; decision ledger, conflict check and split to clones next): HACKATHON.md.
+The hackathon meeting agent (stage 1 "Meeting in", ADR-055 proposed; stage 2-3 decision ledger, conflicts, split to Clones; stage 5 proof and tracking): HACKATHON.md.
 
 ## The plan (locked 28 Oct 2026)
 
@@ -267,4 +267,8 @@ The hackathon meeting agent (stage 1 "Meeting in" built, ADR-055 proposed; decis
   answer is read strictly (kairu/meeting/read.py): an owner is never guessed, a deadline is a real date or "", a quote not in
   the transcript is marked and never shown as evidence; nothing in it runs. data/meetings.db never leaves the PC and never
   goes into the audit log. The workspace's Meetings page is read only, like Clones.
+  Proof and tracking (HACKATHON.md stage 5): a meeting's split links each Clone task to the item it does (data/meetings.db
+  `work`, kept by team.split; an id the brief didn't carry is never linked). Only the team board's own state "done", for
+  every task linked to an item in one split, makes the item done (team.run and team.check write it back, with its proof);
+  a Clone's words never do, and a replaced or dropped item stays as the manager decided. meeting.brief is Low and read only.
 - Run the checks before pushing: `python tools/check_guardian.py` (Windows: `py -3.12 tools\check_guardian.py`).

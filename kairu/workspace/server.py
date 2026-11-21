@@ -154,9 +154,13 @@ class Workspace:
             found = MeetingStore(self.cfg.data_dir).meetings() if exists(self.cfg.data_dir) else []
             chosen = number or (found[0]["number"] if found else None)
             meeting = MeetingStore(self.cfg.data_dir).meeting(chosen, transcript=True) if chosen else None
-            from kairu.meeting import ledger
+            from kairu.meeting import ledger, proof
+            before = proof.before(self.cfg.data_dir)  # stage 5: the brief before the next meeting, and each item's Clone work
+            if meeting:
+                meeting["items"] = proof.overlay(meeting["items"], proof.progress(self.cfg.data_dir))
             return {"meetings": found, "meeting": meeting, "live": live(self.cfg.data_dir),
-                    "work_folder": str(self.cfg.work_folder), "check": ledger.check(self.cfg.data_dir)}
+                    "work_folder": str(self.cfg.work_folder), "check": before["conflicts"] if found else ledger.check(self.cfg.data_dir),
+                    "before": before}
         except Exception as error:
             print(f"kairu workspace: meetings: {type(error).__name__}", file=sys.stderr, flush=True)
             return {"meetings": [], "meeting": None, "live": None, "work_folder": str(self.cfg.work_folder)}

@@ -62,6 +62,18 @@ def test_another_name_for_a_clone_is_it_when_there_is_one_or_clone_n_but_never_a
         split.parse(answer([task(clone="Clone 3")]), CLONES)
 
 
+def test_an_order_that_opens_no_named_website_is_left_out():
+    """Found on the laptop, 21 Nov 2026: "open website" was refused on the Clone, and the next order became "... in website"."""
+    tasks = split.parse(answer([task(orders=["google Razorpay integration guide", "open website",
+                                             "research top 3 features of Razorpay", "type summary in notepad"])]), CLONES)
+    assert tasks[0]["orders"] == ["google Razorpay integration guide", "research top 3 features of Razorpay",
+                                  "type summary in notepad"]
+    assert split.parse(answer([task(orders=["open razorpay.com"])]), CLONES)[0]["orders"] == ["open razorpay.com"]
+    with pytest.raises(split.NoSplit, match="without naming it"):
+        split.parse(answer([task(orders=["open the website"])]), CLONES)
+    assert "never just 'open website'" in split.instructions(CLONES, 60)
+
+
 def test_words_that_are_not_json_are_no_split():
     with pytest.raises(split.NoSplit):
         split.parse("Sure! Ravi does the copy and Anu the research.", CLONES)
@@ -86,7 +98,10 @@ def test_the_clone_takes_the_tag_off_and_main_kairu_reads_it_back():
 
 @pytest.mark.parametrize("words, bad", [("Opened Notepad.", False), ("Refused: notepad isn't open.", True),
                                          ("Not done: you refused the plan. Nothing ran.", True), ("Done.", False),
-                                         ("I can't do that yet.", True), ("Guardian refused step 1 (files.delete).", True)])
+                                         ("I can't do that yet.", True), ("Guardian refused step 1 (files.delete).", True),
+                                         ("Another window came to the front, so I pressed nothing.", True),
+                                         ("Another window came to the front, so I clicked nothing.", True),
+                                         ("Pressed Ctrl+S in Notepad.", False)])
 def test_a_finished_step_that_says_it_failed_blocks_its_task(words, bad):
     assert peers.failed(words) is bad
 
@@ -170,6 +185,40 @@ def test_a_failed_step_blocks_its_task_and_starting_again_tries_it_once_more(tea
     assert "Refused" in store.tasks(number)[0]["last"]
     runner.begin()
     assert states(store, number)[0] == (WAITING, 0)
+
+
+def test_starting_again_resends_an_order_whose_report_never_came_but_not_one_still_waiting(team):
+    store, runner, number, sent, fakes = team
+    runner.hand_out()
+    assert states(store, number)[:2] == [(SENT, 0), (SENT, 0)]
+    store.set_task(number, 1, sent=1000.0 - conduct.QUIET_SECONDS - 1)  # Ravi's report was lost long ago
+    store.set_task(number, 2, sent=1000.0 - 60)                          # Anu's step may still be waiting for a PIN
+    runner.begin()
+    assert states(store, number)[:2] == [(WAITING, 0), (SENT, 0)]
+    assert "sending it again" in store.tasks(number)[0]["last"]
+    runner.hand_out()
+    assert sent[-1] == ("Ravi", number, 1, 1, "open notepad")  # the same order, the same step tag
+    fakes["Ravi"].inbox.append(f"[K{number}.1.1 finished] Opened Notepad.")
+    runner.listen()
+    assert states(store, number)[0] == (WAITING, 1)
+
+
+def test_a_resent_close_of_an_app_already_closed_counts_as_done(tmp_path):
+    store = TeamStore(tmp_path)
+    store.add_clone("Ravi", "dev-" + "1" * 16)
+    number = store.add_project("One", "one", None, [task("Note", "Ravi", ["open notepad", "close notepad"])])
+    fake = FakePeer("Ravi", [])
+    runner = conduct.Runner(tmp_path, number, sleep=lambda s: None, make_peer=lambda name: fake)
+    runner.begin()
+    runner.hand_out()
+    fake.inbox.append(f"[K{number}.1.1 finished] Refused: notepad isn't open.")  # an open that failed still blocks
+    runner.listen()
+    assert states(store, number)[0] == (BLOCKED, 0)
+    store.set_task(number, 1, state=WAITING, step=1)
+    runner.hand_out()
+    fake.inbox.append(f"[K{number}.1.2 finished] Refused: notepad isn't open.")  # the close: already closed, so done
+    runner.listen()
+    assert states(store, number)[0] == (DONE, 2)
 
 
 def test_an_untagged_word_from_a_clone_is_only_a_note_on_its_running_task(team):

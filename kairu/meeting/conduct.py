@@ -8,6 +8,7 @@
     meeting.stop    (Low)     end the recording: meeting.record hands what it heard to Gemini
     meeting.show    (Low)     what came out of a meeting, in a few lines (read only)
     meeting.forget  (Medium)  delete a meeting, its transcript and its items from data/meetings.db
+    meeting.brief   (Low)     stage 5: the brief before the next meeting - done (with proof), open, slipping, conflicts
 
 None of them runs anything that came out of a meeting: decisions and actions are data, kept in data/meetings.db for you to
 see. Splitting them into work (stage 3) is its own action, shown first and decided by Guardian.
@@ -80,7 +81,8 @@ def understand(data_dir: str, brain: dict | None, lines: list[str], held: date, 
     lines, count = read.left_out(lines)
     text = read.joined(lines)
     gateway = gateway or _gateway(data_dir, brain)
-    ledger = MeetingStore(data_dir).ledger(before=held.isoformat(), leave_out_sha=sha) if exists(data_dir) else []
+    from kairu.meeting import proof
+    ledger = proof.ledger(data_dir, before=held.isoformat(), leave_out_sha=sha)  # stage 5: work the Clones finished is done
     earlier = read.earlier_lines(ledger)  # stage 2: the decision ledger, so Gemini can spot clashes with earlier meetings
     shown = {(item["meeting"], item["number"]) for item in ledger if item.get("status", "open") == "open"}
     answer, provider = _ask(gateway, read.instructions(held, title, earlier), f"Meeting transcript:\n{text}", json_answer=True)
@@ -323,6 +325,15 @@ def resolve(data_dir: str, job: str, meeting: float, conflict: float, keep: str)
             return (f"Kept the new one: {found['what']} The earlier item is now marked replaced in the ledger.")
         return f"Kept the earlier one: the newer item is dropped. ({found['what']})"
     return _guarded(data_dir, job, work)
+
+
+# --- stage 5: proof and tracking ------------------------------------------------------------------------------------
+
+def before(data_dir: str, job: str) -> int | None:
+    """meeting.brief (Low, read only): the brief before the next meeting - what the Clones got done (with proof), what is
+    still open, slipping Clone tasks, conflicts to decide and open questions. By rules; nothing is sent or changed."""
+    from kairu.meeting import proof
+    return _guarded(data_dir, job, lambda: proof.told_before(proof.before(data_dir)))
 
 
 if __name__ == "__main__":  # pragma: no cover

@@ -134,7 +134,10 @@ def read_report(body: str) -> tuple[tuple[int, int, int] | None, bool, str]:
 
 
 FAILED = re.compile(r"^(?:refused|not done|guardian refused|stopped|i can'?t|sorry|that didn'?t work|not approved)"
-                    r"|nothing ran|did not start|didn'?t start|isn'?t allowed|was refused", re.I)
+                    r"|nothing ran|did not start|didn'?t start|isn'?t allowed|was refused"
+                    # the hands' own words when a step did nothing (found on the laptop, 21 Nov 2026: "Another window came to
+                    # the front, so I pressed nothing." finished a save step that never happened, and the task counted done)
+                    r"|so i (?:pressed|typed|clicked) nothing", re.I)
 
 
 def failed(words: str) -> bool:

@@ -48,8 +48,17 @@ def _who(clone: dict, busy: dict) -> str:
     return said + ")"
 
 
-def instructions(clones: list[dict], minutes: float | None, busy: dict | None = None) -> str:
-    """`busy`: minutes of unfinished work each Clone already has in other projects, so the split weighs workload."""
+FROM = re.compile(r"[AD]\d{1,6}\.\d{1,3}")  # a meeting item's id, as a meeting's brief carries it ([A2.3])
+# The id is never written in quotes here: the backstop (kairu/brain/privacy.py) reads a quoted word like a code next to the
+# word "password" (the rules above) as a password being sent, and stops everything (found on the laptop, 21 Nov 2026)
+FROM_LINE = (" The brief comes from a meeting: each of its lines starts with an id in brackets, such as [A2.3]. Give each "
+             "task a from field holding the id of the line of the brief it does, without the brackets, such as A2.3 (an A id "
+             "when there is one).")
+
+
+def instructions(clones: list[dict], minutes: float | None, busy: dict | None = None, ids: bool = False) -> str:
+    """`busy`: minutes of unfinished work each Clone already has in other projects, so the split weighs workload. `ids`: the
+    brief comes from a meeting (HACKATHON.md stage 5), so each task names the meeting item it does."""
     team = "; ".join(_who(clone, busy or {}) for clone in clones)
     time_left = f"about {int(minutes)} minutes until the deadline" if minutes else "no deadline given"
     return (
@@ -60,7 +69,8 @@ def instructions(clones: list[dict], minutes: float | None, busy: dict | None = 
         + " | ".join(EXAMPLES) + ". "
         "Only use orders like these: open or close an app, type words in an app, save in an app, make a text file with words, "
         "open a file, google something, open a website, research a question or ask a question. Every type, press, save or click "
-        "order ends with in and its app, such as 'type Hello in notepad', after an order that opens that app. Never an order with a PIN, a "
+        "order ends with in and its app, such as 'type Hello in notepad', after an order that opens that app. To open a "
+        "website, name it, such as 'open razorpay.com'; never just 'open website'. Never an order with a PIN, a "
         "password, money, a purchase, installing, deleting or a terminal.\n"
         "Answer with JSON only, no other words: "
         '{"tasks": [{"title": "...", "clone": "<a Clone\'s name>", "orders": ["...", "..."], '
@@ -70,6 +80,7 @@ def instructions(clones: list[dict], minutes: float | None, busy: dict | None = 
         "Give each task to the Clone whose skills fit it best, and balance the work by share and by how busy each Clone "
         "already is. Give every Clone at least one task when there is enough work. Keep titles short. The done field says "
         "how the manager can check the task is finished, such as 'homepage.txt exists with a hero line'."
+        + (FROM_LINE if ids else "")
     )
 
 
@@ -85,6 +96,20 @@ def _text(value, longest: int, what: str) -> str:
 HANDS = re.compile(r"^(?:type|press|save|click)\b", re.I)
 OPENS = re.compile(r"^open (?!file\b|the file\b)([a-z0-9][a-z0-9 .+&-]{0,39})$", re.I)
 ENDS_IN = re.compile(r"\bin [a-z0-9][a-z0-9 .+&-]{0,39}$", re.I)
+
+
+VAGUE_OPEN = re.compile(r"^open (?:a |the |any |that |this )?(?:website|web ?site|site|webpage|web page|page|link|result|"
+                        r"first result|search result|it)s?$", re.I)
+
+
+def drop_vague(orders: list[str], number: int) -> list[str]:
+    """An order that opens no named thing ("open website") can't be done on any laptop (found on the laptop, 21 Nov 2026:
+    "I can't find an app called website", and the next order became "type ... in notepad in website"). Kairu only leaves
+    such an order out; a task left with no orders is no split."""
+    kept = [order for order in orders if not VAGUE_OPEN.match(order.strip(" ."))]
+    if not kept:
+        raise NoSplit(f"task {number} only opens a website without naming it")
+    return kept
 
 
 def name_apps(orders: list[str], number: int) -> list[str]:
@@ -132,7 +157,7 @@ def parse(text: str, clones: list[dict]) -> list[dict]:
         return None
     out = []
     for number, task in enumerate(tasks, 1):
-        if not isinstance(task, dict) or set(task) - {"title", "clone", "orders", "done", "after", "minutes"}:
+        if not isinstance(task, dict) or set(task) - {"title", "clone", "orders", "done", "after", "minutes", "from"}:
             raise NoSplit(f"task {number} has parts a task doesn't have")
         clone = which(task.get("clone"))
         if clone is None:
@@ -140,7 +165,7 @@ def parse(text: str, clones: list[dict]) -> list[dict]:
         orders = task.get("orders")
         if not isinstance(orders, list) or not 1 <= len(orders) <= MOST_ORDERS:
             raise NoSplit(f"task {number} needs 1 to {MOST_ORDERS} orders")
-        orders = name_apps([_text(order, LONGEST_ORDER, "order") for order in orders], number)
+        orders = name_apps(drop_vague([_text(order, LONGEST_ORDER, "order") for order in orders], number), number)
         if any(FORBIDDEN.search(order) for order in orders):
             raise NoSplit(f"task {number} has an order with a PIN, a password or an approval in it")
         after = task.get("after", [])
@@ -149,9 +174,13 @@ def parse(text: str, clones: list[dict]) -> list[dict]:
         minutes = task.get("minutes", 10)
         if type(minutes) not in (int, float) or not 1 <= minutes <= 600:
             raise NoSplit(f"task {number}'s minutes must be 1 to 600")
-        out.append({"title": _text(task.get("title"), LONGEST_TITLE, "title"), "clone": clone, "orders": orders,
-                    "done": _text(task.get("done") or "its orders all finished", LONGEST_DONE, "done check"),
-                    "after": sorted(set(after)), "minutes": float(minutes)})
+        read = {"title": _text(task.get("title"), LONGEST_TITLE, "title"), "clone": clone, "orders": orders,
+                "done": _text(task.get("done") or "its orders all finished", LONGEST_DONE, "done check"),
+                "after": sorted(set(after)), "minutes": float(minutes)}
+        named = str(task.get("from") or "").strip().strip("[]")
+        if FROM.fullmatch(named):  # only an id's shape; kairu/meeting/proof.py keeps it only if the brief carried it
+            read["from"] = named
+        out.append(read)
     return out
 
 

@@ -5,7 +5,10 @@
               (secrets already left out), the summary and the people
     items     what came out of it: each decision, action and open question, with its owner, its deadline (a real date or ""),
               the words that show it (quote, and whether that quote is really in the transcript) and its status. Stage 2 (the
-              decision ledger, HACKATHON.md) reads and changes the status: open, done, replaced
+              decision ledger, HACKATHON.md) reads and changes the status: open, done, replaced. Stage 5 (proof): an item whose
+              Clone work is all done becomes done, with its proof (who did it, its "done when" check, what was made)
+    work      stage 5: which Clone task (team.db project and task) came from which meeting item, kept when Main Kairu splits a
+              meeting (team.split); only links, never an order
 
 Nothing here is a permission or an order, and nothing is sent anywhere: the file never uses the network. A transcript's
 words never go into Guardian's audit log (Guardian keeps only hashes of an action's details). A secret is never kept: a
@@ -56,7 +59,18 @@ CREATE TABLE IF NOT EXISTS items (
     owner_heard INTEGER NOT NULL DEFAULT 0,     -- 1: the owner's name is in the transcript
     status     TEXT NOT NULL DEFAULT 'open',
     changed    REAL,
+    proof      TEXT NOT NULL DEFAULT '',        -- stage 5: what the Clones made for it (shown only)
+    done_at    REAL,                            -- stage 5: when its Clone work was all done
     PRIMARY KEY (meeting, number)
+);
+CREATE TABLE IF NOT EXISTS work (
+    project    INTEGER NOT NULL,       -- the team.db project Main Kairu split it into
+    task       INTEGER NOT NULL,       -- that project's task
+    meeting    INTEGER NOT NULL,       -- the meeting item it came from
+    item       INTEGER NOT NULL,
+    how        TEXT NOT NULL,          -- "named": the split named the item's id; "matched": Kairu matched the words; "only": the one item
+    made       REAL NOT NULL,
+    PRIMARY KEY (project, task, meeting, item)
 );
 CREATE TABLE IF NOT EXISTS conflicts (
     meeting    INTEGER NOT NULL,       -- the meeting that raised it (the newer one)
@@ -75,6 +89,9 @@ CREATE TABLE IF NOT EXISTS conflicts (
 
 CONFLICT_KINDS = ("decision", "deadline", "owner", "workload", "dependency")
 CONFLICT_STATUSES = ("open", "kept-new", "kept-old")
+
+UPGRADES = (("items", "proof", "TEXT NOT NULL DEFAULT ''"), ("items", "done_at", "REAL"))  # a meetings.db from stage 1-3
+LINK_HOW = ("named", "matched", "only")
 
 ITEM_FIELDS = ("kind", "what", "owner", "due", "due_said", "replaces", "quote", "at", "sure", "heard", "owner_heard")
 
@@ -95,6 +112,9 @@ class MeetingStore:
         new = not self.path.exists()
         with closing(self.connect()) as db:
             db.executescript(SCHEMA)
+            for table, column, kind in UPGRADES:
+                if column not in {row[1] for row in db.execute(f"PRAGMA table_info({table})")}:
+                    db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {kind}")
             db.commit()
         if new and sys.platform != "win32":
             os.chmod(self.path, 0o600)
@@ -237,8 +257,59 @@ class MeetingStore:
             db.commit()
             return dict(row)
 
+    # --- stage 5: proof and tracking (kairu/meeting/proof.py) -----------------------------------------------------------
+
+    def link(self, project: int, task: int, meeting: int, item: int, how: str) -> None:
+        """Clone task (project, task) came from this meeting item. Kept once; a link to an item that isn't there is refused."""
+        if how not in LINK_HOW:
+            raise MeetingError(f"a link is one of {', '.join(LINK_HOW)}")
+        with closing(self.connect()) as db:
+            if not db.execute("SELECT 1 FROM items WHERE meeting = ? AND number = ?", (int(meeting), int(item))).fetchone():
+                raise MeetingError(f"meeting {meeting} has no item {item}")
+            db.execute("INSERT OR IGNORE INTO work (project, task, meeting, item, how, made) VALUES (?, ?, ?, ?, ?, ?)",
+                       (int(project), int(task), int(meeting), int(item), how, time.time()))
+            db.commit()
+
+    def links(self) -> list[dict]:
+        with closing(self.connect()) as db:
+            return [dict(row) for row in db.execute("SELECT * FROM work ORDER BY project, task, meeting, item")]
+
+    def set_done(self, meeting: int, number: int, proof: str, when: float | None = None) -> bool:
+        """Its Clone work is done: an open item becomes done with its proof; a done item's proof is brought up to date.
+        A replaced or dropped item stays as the manager decided. True if anything changed."""
+        proof = " ".join(str(proof).split())[:1200]
+        with closing(self.connect()) as db:
+            row = db.execute("SELECT status, proof FROM items WHERE meeting = ? AND number = ?",
+                             (int(meeting), int(number))).fetchone()
+            if not row or row["status"] not in ("open", "done") or (row["status"] == "done" and row["proof"] == proof):
+                return False
+            now = when or time.time()
+            db.execute("UPDATE items SET status = 'done', proof = ?, done_at = COALESCE(done_at, ?), changed = ? "
+                       "WHERE meeting = ? AND number = ?", (proof, now, time.time(), int(meeting), int(number)))
+            db.commit()
+            return True
+
+    def reopen(self, meeting: int, number: int) -> None:
+        """A decision an earlier version marked done from its Clone work: open again (a decision isn't finished by a task).
+        Only one with Kairu's proof on it; one the manager changed is left as it is."""
+        with closing(self.connect()) as db:
+            db.execute("UPDATE items SET status = 'open', proof = '', done_at = NULL, changed = ? WHERE meeting = ? AND "
+                       "number = ? AND kind = 'decision' AND status = 'done' AND proof != ''",
+                       (time.time(), int(meeting), int(number)))
+            db.commit()
+
+    def items_of(self, kind: str = "", status: str = "") -> list[dict]:
+        """Every item of this kind and status ("" : any), with its meeting's title and day, oldest meeting first."""
+        with closing(self.connect()) as db:
+            rows = db.execute(
+                "SELECT i.*, m.title AS meeting_title, m.held AS held FROM items i JOIN meetings m ON m.number = i.meeting "
+                "WHERE (? = '' OR i.kind = ?) AND (? = '' OR i.status = ?) ORDER BY m.held, m.number, i.number",
+                (kind, kind, status, status)).fetchall()
+            return [dict(row, heard=bool(row["heard"]), owner_heard=bool(row["owner_heard"])) for row in rows]
+
     def forget(self, number: int) -> bool:
         with closing(self.connect()) as db:
+            db.execute("DELETE FROM work WHERE meeting = ?", (int(number),))
             db.execute("DELETE FROM conflicts WHERE meeting = ?", (int(number),))
             db.execute("DELETE FROM items WHERE meeting = ?", (int(number),))
             gone = db.execute("DELETE FROM meetings WHERE number = ?", (int(number),)).rowcount

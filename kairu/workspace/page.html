@@ -220,6 +220,20 @@ textarea.field { min-height: 90px; resize: vertical; }
 .mt-rule { border: 1px solid var(--amber); background: var(--amber-soft); border-radius: 12px; padding: 10px 14px; margin-bottom: 8px; }
 .mt-rule .k { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--amber); font-weight: 700; }
 .mt-tag.gone { text-decoration: line-through; opacity: .75; }
+/* stage 5: proof and tracking */
+.mt-tag.done { background: var(--green-soft, var(--accent-soft)); color: var(--green, var(--text)); font-weight: 600; }
+.mt-tag.work { background: var(--accent-soft); color: var(--text); }
+.mt-proof { margin-top: 8px; border-left: 3px solid var(--green, var(--accent)); padding: 4px 0 4px 10px; font-size: 13px; color: var(--text); }
+.mt-proof b { color: var(--green, var(--accent)); margin-right: 4px; }
+.mt-before { border: 1px solid var(--border); background: var(--surface); border-radius: 14px; padding: 12px 14px; margin-top: 14px; }
+.mt-before h3 { font: 400 18px/1.3 var(--serif); margin: 0 0 6px; }
+.mt-before .row { font-size: 13px; padding: 3px 0; display: flex; gap: 8px; align-items: baseline; }
+.mt-before .row .m { flex: none; width: 16px; text-align: center; font-weight: 700; }
+.mt-before .row.ok .m { color: var(--green, var(--accent)); }
+.mt-before .row.late .m, .mt-before .row.late .w { color: var(--red); }
+.mt-before .row.open .m { color: var(--muted); }
+.mt-before .sub { color: var(--muted); font-size: 12px; }
+.mt-before .acts { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; align-items: center; }
 .mt-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; border: 1px solid var(--border); background: var(--surface); border-radius: 14px; padding: 12px 14px; }
 .mt-bar input { flex: 1; min-width: 220px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--bg); }
 .mt-rec { display: inline-flex; align-items: center; gap: 8px; }
@@ -1019,11 +1033,14 @@ textarea.field { min-height: 90px; resize: vertical; }
       else if (item.due_said) tags.append(el("span", "mt-tag missing", "\u{1F4C5} “" + item.due_said + "” (no date)"));
       else if (item.kind === "action") tags.append(el("span", "mt-tag missing", "No deadline"));
     }
-    if (item.status && item.status !== "open") tags.append(el("span", "mt-tag" + (item.status === "done" ? " owner" : " gone"), item.status));
+    if (item.status && item.status !== "open") tags.append(el("span", "mt-tag" + (item.status === "done" ? " done" : " gone"), item.status === "done" ? "\u2713 done" : item.status));
+    if (item.work && item.status !== "done") tags.append(el("span", "mt-tag work", "Clones: " + item.work.done + " of " + item.work.total + " task" + (item.work.total === 1 ? "" : "s") + " done"));
+    if (item.work && item.status !== "done" && item.work.check && item.work.check.length) tags.append(el("span", "mt-tag missing", "Check " + item.work.check.join(", ") + ": it did nothing"));
     if (item.sure === "low") tags.append(el("span", "mt-tag low", "unsure"));
     else if (item.sure === "medium") tags.append(el("span", "mt-tag", "read from context"));
     if (tags.childNodes.length) box.append(tags);
     if (item.replaces) box.append(el("div", "mt-replaces", "Replaces: " + item.replaces));
+    if (item.status === "done" && item.proof) { const pr = el("div", "mt-proof"); pr.append(el("b", "", "Proof"), document.createTextNode(item.proof)); box.append(pr); }
     if (item.quote) {
       const q = el("div", "mt-quote" + (item.heard ? "" : " unheard"));
       if (item.heard && item.at) { const b = el("button", "", "[" + item.at + "]"); b.addEventListener("click", () => jump(item.quote)); q.append(b); }
@@ -1070,6 +1087,7 @@ textarea.field { min-height: 90px; resize: vertical; }
       meetingTimer(data.live);
       return;
     }
+    if (data.before) view.append(beforeBox(data.before));
     const layout = el("div", "mt-layout");
     const list = el("div", "mt-list");
     const m = data.meeting;
@@ -1183,7 +1201,29 @@ textarea.field { min-height: 90px; resize: vertical; }
     $("scroll").scrollTop = keepScroll;
     meetingTimer(data.live);
   }
-  function meetingSig(data) { return JSON.stringify([data.meetings.map(x => [x.number, x.decisions, x.actions, x.questions]), !!data.live, data.meeting && (data.meeting.conflicts || []).map(c => c.status), data.meeting && data.meeting.items.map(i => i.status), data.check && data.check.rules.length]); }
+  // stage 5: the brief before the next meeting - what the Clones got done (with proof), what's open, slipping, conflicts
+  function beforeBox(b) {
+    const box = el("div", "mt-before");
+    const conflicts = (b.conflicts.between || []).length + (b.conflicts.rules || []).length;
+    box.append(el("h3", "", "Before the next meeting"));
+    const stats = el("div", "mt-stats"); stats.style.margin = "4px 0 8px";
+    const stat = (n, label, warn) => { const s = el("div", "mt-stat" + (warn ? " warn" : "")); s.append(el("b", "", String(n)), el("span", "", label)); stats.append(s); };
+    stat(b.done.length, "done, with proof"); stat(b.open.length, "still open", false);
+    if (b.overdue) stat(b.overdue, "overdue", true);
+    stat(b.slipping.length, "slipping", b.slipping.length > 0); stat(conflicts, "conflicts to decide", conflicts > 0);
+    box.append(stats);
+    const row = (cls, mark, text, sub) => { const r = el("div", "row " + cls); r.append(el("span", "m", mark)); const t = el("span", "w", text); if (sub) { t.append(el("br")); t.append(el("span", "sub", sub)); } r.append(t); box.append(r); };
+    for (const i of b.done.slice(0, 5)) row("ok", "\u2713", i.what + " (" + i.meeting_title + ", " + dayOf(i.held) + ")", i.proof || "marked done in the ledger");
+    for (const t of b.slipping.slice(0, 5)) row("late", "!", "Task " + t.number + " “" + t.title + "” (" + t.clone + ") is " + t.why + (t.item ? " - for “" + t.item.what + "”" : ""), t.last || "");
+    for (const i of b.open.slice(0, 5)) row(i.overdue ? "late" : "open", "\u00b7", i.what + " - " + (i.owner || "nobody yet") + (i.due ? (i.overdue ? ", overdue since " : ", due ") + dayOf(i.due) : ""), i.work ? "Clones: " + i.work.done + " of " + i.work.total + " tasks done" + (i.work.check && i.work.check.length ? " · check " + i.work.check.join(", ") + ": it did nothing" : "") : "not split to the Clones yet");
+    if (!b.done.length && !b.open.length && !b.slipping.length) box.append(el("div", "muted", "Nothing open: every action agreed is done."));
+    const acts = el("div", "acts");
+    const brief = el("button", "btn primary", "Brief me for the next meeting"); brief.addEventListener("click", () => meetingOrder("brief me for the next meeting"));
+    acts.append(brief, el("span", "muted", "Each finished Clone task is written back to the action it came from, with what was made."));
+    box.append(acts);
+    return box;
+  }
+  function meetingSig(data) { const b = data.before || { done: [], open: [], slipping: [] }; return JSON.stringify([data.meetings.map(x => [x.number, x.decisions, x.actions, x.questions]), !!data.live, data.meeting && (data.meeting.conflicts || []).map(c => c.status), data.meeting && data.meeting.items.map(i => [i.status, i.work ? i.work.done : -1]), data.check && data.check.rules.length, b.done.length, b.open.length, b.slipping.length]); }
   function meetingTimer(live) {  // a recording ticks every second; otherwise the page changes only when a meeting comes in
     clearTimeout(meetingTimer.t);
     meetingTimer.t = setTimeout(async () => {
