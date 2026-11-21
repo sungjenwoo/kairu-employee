@@ -112,8 +112,9 @@ def check(data_dir) -> dict:
     """Everything the conflict check knows: Gemini's open conflicts between meetings and Kairu's own rule checks."""
     if not exists(data_dir):
         return {"between": [], "rules": []}
+    from kairu.meeting import proof
     store = MeetingStore(data_dir)
-    return {"between": store.conflicts("open"), "rules": rule_conflicts(store.ledger(), busy(data_dir))}
+    return {"between": store.conflicts("open"), "rules": rule_conflicts(proof.ledger(data_dir), busy(data_dir))}
 
 
 def told_check(found: dict) -> str:
@@ -144,7 +145,12 @@ def told_ledger(ledger: list[dict]) -> str:
             out.append(f"Meeting {item['meeting']}: {item['meeting_title']} ({_day(item['held'])})")
         extra = "".join((f", {item['owner']}" if item["owner"] else ", nobody yet" if item["kind"] == "action" else "",
                          f", due {_day(item['due'])}" if item["due"] else ""))
+        work = item.get("work")
+        if work and item["status"] != "done":
+            extra += f", Clones {work['done']} of {work['total']} tasks done"
         out.append(f"  {item['number']}. [{item['status']}] {item['kind']}: {item['what']}{extra}")
+        if item["status"] == "done" and item.get("proof"):
+            out.append(f"     Proof: {item['proof']}")
     return "\n".join(out)
 
 
@@ -157,7 +163,8 @@ def ask(data_dir, topic: str) -> str:
     wanted = words(topic)
     if not wanted:
         return "Say what it's about, for example: what did we decide about the launch date?"
-    ledger = MeetingStore(data_dir).ledger()
+    from kairu.meeting import proof
+    ledger = proof.ledger(data_dir)
     scored = []
     for item in ledger:
         shared = wanted & (words(item["what"]) | words(item.get("quote", "")))
@@ -172,6 +179,8 @@ def ask(data_dir, topic: str) -> str:
     out = [f"About {topic}: {newest['what']} ({newest['meeting_title']}, {_day(newest['held'])}, {newest['status']})."]
     if newest.get("quote"):
         out.append(f"Said{' at ' + newest['at'] if newest.get('at') else ''}: \"{newest['quote']}\"")
+    if newest["status"] == "done" and newest.get("proof"):
+        out.append(f"Proof: {newest['proof']}")
     for item in found[1:]:
         out.append(f"Before that: {item['what']} ({item['meeting_title']}, {_day(item['held'])}, {item['status']}).")
     return "\n".join(out)
@@ -179,11 +188,14 @@ def ask(data_dir, topic: str) -> str:
 
 def brief(data_dir, meeting: int | None = None) -> tuple[str, str]:
     """Stage 3: the open actions (and the decisions they serve) as a brief for Main Kairu's split (team.split). Returns
-    (name, brief). meeting None: every meeting's open actions. Raises ValueError with what to tell you."""
+    (name, brief). meeting None: every meeting's open actions. Raises ValueError with what to tell you.
+
+    Stage 5: each line starts with its id ([A2.3] an action, [D2.1] a decision), so team.split can link every Clone task
+    back to the item it does (kairu/meeting/proof.py). An item whose Clone work is already done is left out."""
     if not exists(data_dir):
         raise ValueError("No meetings yet: read one first.")
-    store = MeetingStore(data_dir)
-    ledger = [item for item in store.ledger() if item["status"] == "open" and (meeting is None or item["meeting"] == meeting)]
+    from kairu.meeting import proof
+    ledger = [item for item in proof.ledger(data_dir) if item["status"] == "open" and (meeting is None or item["meeting"] == meeting)]
     actions = [item for item in ledger if item["kind"] == "action"]
     if not actions:
         raise ValueError("There are no open actions to split.")
@@ -191,8 +203,9 @@ def brief(data_dir, meeting: int | None = None) -> tuple[str, str]:
     title = ledger[-1]["meeting_title"] if meeting else "the meetings"
     parts = [f"Work agreed in {title}."]
     if decisions:
-        parts.append("Decided: " + "; ".join(item["what"] for item in decisions[-6:]) + ".")
+        parts.append("Decided: " + "; ".join(f"[D{item['meeting']}.{item['number']}] {item['what']}"
+                                             for item in decisions[-6:]) + ".")
     parts.append("Tasks: " + "; ".join(
-        item["what"] + (f" (owner {item['owner']})" if item["owner"] else "") + (f" (due {item['due']})" if item["due"] else "")
-        for item in actions[:12]) + ".")
+        f"[A{item['meeting']}.{item['number']}] {item['what']}" + (f" (owner {item['owner']})" if item["owner"] else "")
+        + (f" (due {item['due']})" if item["due"] else "") for item in actions[:12]) + ".")
     return (f"From {title}"[:60], " ".join(parts)[:1900])

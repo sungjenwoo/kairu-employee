@@ -4,8 +4,29 @@
 **cross-meeting memory** and **conflict detection**; a simple meeting summarizer is not enough.
 
 **Status (21 Nov 2026):** stage 1, **Meeting in, is built** and laptop-tested (ADR-055, proposed). **Stage 2 (memory and
-conflicts) and stage 3 (split to Clones) are built** on top of it (branch `meeting-ledger`), laptop test pending. Stage 5
-(proof written back to the decision) is next.
+conflicts) and stage 3 (split to Clones) are built** on top of it (branch `meeting-ledger`). **Stage 5 (proof and tracking)
+is built** on top of that (branch `meeting-proof`), laptop test pending.
+
+## Stage 5: proof and tracking (built)
+
+| Order (bar, workspace) | PowerShell | What happens |
+| --- | --- | --- |
+| `split the meeting` (as before) | `kairu meeting split` | The brief now carries each item's id (`[A2.3]` an action, `[D2.1]` a decision). Main Kairu's split names the id each task does (`"from"`); if it doesn't, Kairu matches the words (and the owner's name); a brief with one action links every task to it. The answer says "Linked to the meeting: task 1 → A2.3 …". Links are kept in data/meetings.db (`work` table). |
+| (nothing to say) | `kairu team start` | When the team board marks a task done, team.run writes it back: the action (and the decision it serves) becomes **done** in the ledger, with its **proof**: which Clone did which task, when, its "done when" check, the files it made, and what the Clone said. The team feed says "Written back to the ledger as done: …". `kairu team check P T` adds "(checked by you)". |
+| `brief me for the next meeting` / `what got done` / `show the proof` | `kairu meeting brief` | Before the next meeting (`meeting.brief`, Low, read only): what got done (with proof), what's still open (overdue, no owner, how many Clone tasks done, or "not split yet"), slipping / blocked / silent Clone tasks with the meeting item each does, conflicts to decide, open questions; then one question. |
+| | `kairu meeting ledger` | Each done item shows its proof line; open items show "Clones 1 of 2 tasks done". |
+
+The Meetings page: a **Before the next meeting** box (done, open, overdue, slipping, conflicts, with a "Brief me" button);
+each item shows "✓ done" with its **Proof**, or "Clones: 1 of 2 tasks done".
+
+How it stays honest: only the team board's own state "done" (every task linked to the item, in one split) moves an item; a
+Clone's words never do. A replaced or dropped item stays as the manager decided. A done item is left out of the next split
+and of the workload check. Every reader lays the Clone work over the ledger, so "done" shows at once; team.run and team.check
+write it into data/meetings.db. A meetings.db from stages 1-3 gets the new columns by itself.
+
+Code: `kairu/meeting/proof.py` (links, progress, write-back, the brief), `store.py` (work table, proof), `ledger.py` (ids in
+the brief), `kairu/team/split.py` ("from"), `kairu/team/conduct.py` (link on split, write back on done and check), tests in
+`tests_kairu/test_meeting_proof.py`.
 
 ## Stage 2 and 3: memory, conflicts, split (built)
 
@@ -91,4 +112,5 @@ Code: `kairu/meeting/` (read.py, hear.py, store.py, conduct.py, orders.py, comma
    conflicts, with the earlier meeting's date and words, and says Ravi is already over his hours.
 3. The manager resolves them and says yes. Main Kairu splits; a clone opens Notepad or the browser
    and does the first task on screen.
-4. The board shows progress; the ledger shows "done" against the decision from the meeting.
+4. The board shows progress; the ledger shows "done" against the decision from the meeting, with its proof.
+5. Before the next meeting: "brief me for the next meeting": done (with proof), open, slipping, conflicts.

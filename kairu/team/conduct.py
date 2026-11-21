@@ -11,6 +11,10 @@
     team.check   (Medium)  the manager confirms a done task met its "done when" check (growth record)
     team.offer   (Medium)  the manager offers a Clone's person a bigger task; they accept or decline on their laptop
 
+Proof (HACKATHON.md stage 5): a split of a meeting's brief links each task to the meeting item it does (data/meetings.db,
+kairu/meeting/proof.py); when a task is done, team.run (and team.check) writes it back, so the decision ledger shows the
+item done with its proof. Only the board's own state "done" moves an item, never a Clone's words.
+
 The growth record (kairu/team/growth.py, TEAM.md "Growth"): each done task, the manager's check and each offer become an
 entry in that Clone's queue (clones.pending) and ride on its next order, in any project, so the employee sees everything
 recorded about them. A Clone's answer to an offer ("[Kanswer] N yes") changes only that offer, made to that Clone.
@@ -170,6 +174,7 @@ def check(data_dir: str, project: float, task: float) -> None:
     store.set_task(number, which, checked=time.time())
     store.add_pending(found["clone"], f"Record: your manager checked task {which} '{found['title']}' in project {number}: "
                                       "it meets its done check.")
+    write_back(data_dir)  # stage 5: the proof in the meeting ledger now says you checked it
     _say(f"task {which} checked")
 
 
@@ -196,7 +201,10 @@ def split(data_dir: str, brief: str, name: str, deadline: float, ask: str, sourc
     if not clones:
         return _keep(data_dir, ask, source, Result(NOT_SENT, "L3", "No Clones yet: add one with `kairu team add` first."))
     minutes = (deadline - time.time()) / 60 if deadline and deadline > time.time() else None
-    result = Gateway(data_dir, brain).plan(brief, source, instructions(clones, minutes, busy_minutes(store)), longest=4000)
+    from kairu.meeting.proof import ID
+    from_meeting = bool(ID.search(brief or ""))  # a meeting's brief (HACKATHON.md stage 5): each task names its item
+    result = Gateway(data_dir, brain).plan(brief, source, instructions(clones, minutes, busy_minutes(store), from_meeting),
+                                           longest=4000)
     if result.status != ANSWERED:
         return _keep(data_dir, ask, source, result)
     try:
@@ -209,10 +217,41 @@ def split(data_dir: str, brief: str, name: str, deadline: float, ask: str, sourc
     for index, task in enumerate(tasks, 1):
         waits = f", after {', '.join(map(str, task['after']))}" if task["after"] else ""
         lines.append(f"{index}. {task['title']} → {task['clone']} ({task['minutes']:g} min{waits}). Done when: {task['done']}")
+    if from_meeting:
+        lines += _link_meeting(data_dir, number, tasks, brief)
     lines.append("Work per Clone:")
     lines += load_lines(tasks, clones)
     lines.append(f"Check it with `kairu team show {number}`; start it with `kairu team start {number}` (or say \"start the project\").")
     _keep(data_dir, ask, source, Result(ANSWERED, "L3", "\n".join(lines), result.provider, seconds=time.time() - started))
+
+
+def _link_meeting(data_dir: str, project: int, tasks: list[dict], brief: str) -> list[str]:
+    """Stage 5 (HACKATHON.md): link each task of a meeting's split to the meeting item it does, so a finished task is written
+    back to the ledger. Only links in data/meetings.db; a problem here never undoes the split."""
+    try:
+        from kairu.meeting.proof import link_project
+        linked = link_project(data_dir, project, tasks, brief)
+    except Exception as why:  # the split itself is kept either way
+        _say(f"project {project}: the tasks were not linked to the meeting ({type(why).__name__}: {why})", data_dir)
+        return ["The tasks could not be linked back to the meeting items; the split is kept."]
+    if not linked:
+        return ["No task could be linked back to a meeting item (the ledger won't show their proof)."]
+    return ["Linked to the meeting: " + ", ".join(f"task {number} → {item}" for number, item in linked)
+            + (f"; {len(tasks) - len(linked)} task{'s' if len(tasks) - len(linked) != 1 else ''} not linked"
+               if len(linked) < len(tasks) else "") + ". Each finished task is written back to the ledger as done."]
+
+
+def write_back(data_dir: str) -> str:
+    """Stage 5: finished Clone work written back to the meeting items it came from (data/meetings.db). Never stops the team."""
+    try:
+        from kairu.meeting import proof
+        said = proof.told_sync(proof.sync(data_dir), data_dir)
+    except Exception as why:  # the team's work goes on either way; the ledger shows the work on its next read
+        _say(f"the meeting ledger was not updated ({type(why).__name__}: {why})", data_dir)
+        return ""
+    if said:
+        _say(said, data_dir)
+    return said
 
 
 # --- team.run ----------------------------------------------------------------------------------------
@@ -392,6 +431,9 @@ class Runner:
         if step >= len(task["orders"]):
             self.store.set_task(self.project, task["number"], state=DONE, step=step, finished=self.clock(), last=words or "Done.")
             self.record_done(task["number"])
+            said = write_back(self.data_dir)  # stage 5: the meeting item it came from shows done, with its proof
+            if said:
+                self.store.add_feed(self.project, MAIN, "", said, self.clock())
         else:
             self.store.set_task(self.project, task["number"], state=WAITING, step=step, last=words or "Done.")
 

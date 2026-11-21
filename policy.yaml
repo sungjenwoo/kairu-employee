@@ -520,6 +520,13 @@ actions:
     tier: Medium
     private: true
     description: Decide one conflict between meetings - keep the new decision (the earlier one is marked replaced) or the earlier one (the new one is marked dropped); only the ledger on this PC changes
+  # Stage 5 (HACKATHON.md): proof and tracking. Finished Clone work is written back to the ledger by team.run and team.check
+  # (only the board's own "done" moves an item); the brief before the next meeting only reads
+  meeting.brief:
+    tier: Low
+    read_only: true
+    private: true
+    description: Give the brief before your next meeting - what the Clones got done (with the proof of each), what is still open or overdue, Clone tasks that are slipping, conflicts to decide and open questions - from data/meetings.db and the team board on this PC
 
   # The Builder (BUILDER.md, ADR-050 proposed): builds from a public brief, skills Forge writes, and Five Paths. The AI only
   # writes drafts; every step that changes anything is its own action below, or a known skill decided by its own tier

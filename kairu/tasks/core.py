@@ -750,6 +750,7 @@ LABELS = {
     "meeting.read": "read the meeting with Gemini", "meeting.stop": "end the meeting recording",
     "meeting.show": "show what came out of the meeting", "meeting.check": "check the meetings for conflicts",
     "meeting.ask": "look up what the meetings decided", "meeting.resolve": "decide a conflict between meetings",
+    "meeting.brief": "brief you before the next meeting",
 }
 
 

@@ -6,6 +6,7 @@
     "record the meeting [called X]"       meeting.record (High): the mic, in memory only; it runs on after the answer
     "end the meeting"                     meeting.stop (Low)
     "show the last meeting" / "what did we decide in the meeting" / "show meeting 2"   meeting.show (Low)
+    "brief me for the next meeting" / "what got done" / "show the proof"               meeting.brief (Low, stage 5)
 
 Like the team orders, at Main Kairu's own PC only: a phone or another Kairu never reads or records a meeting here. This file
 holds no authority: each order is a Guardian action through the task core, and High waits for "yes" and your PIN.
@@ -38,6 +39,13 @@ RESOLVE = re.compile(r"keep the (?P<keep>new|old|earlier|newer)(?: one| decision
                      r"\.(?P<conflict>\d{1,3})", re.I)
 SPLIT = re.compile(r"(?:split|divide|turn)(?: up)? the (?:meeting|meetings)(?: (?P<number>\d{1,6}))?(?: into (?:tasks|work))?"
                    r"(?:,? (?:in|within) (?P<hours>\d{1,3}(?:\.\d)?) hours?)?", re.I)
+# Stage 5 (HACKATHON.md): the brief before the next meeting - what got done (with proof), open, slipping, conflicts
+BRIEF = re.compile(r"(?:(?:give me |show me |show |open )?(?:the |a |my )?(?:pre-?meeting|premeeting|meeting) brief(?:ing)?"
+                   r"|brief me(?: (?:for|before|on))?(?: the| our| my)?(?: next)? (?:meeting|call|standup|stand-up|sync)"
+                   r"|prep(?:are)?(?: me)? for(?: the| our| my)?(?: next)? (?:meeting|call|standup|stand-up|sync)"
+                   r"|what(?:'s| is) (?:open|left|pending) before(?: the| our)?(?: next)? (?:meeting|call|sync)"
+                   r"|what (?:got|has been|was|have we) (?:done|finished)(?: since(?: the)?(?: last)? (?:meeting|call|sync))?"
+                   r"|(?:show|give)(?: me)? the proof)\??", re.I)
 SECONDS = 420  # a long recording: the upload, Gemini writing it down, and Gemini reading it
 
 
@@ -71,10 +79,13 @@ def find(work_folder, said: str) -> str:
 
 def handle(core, text: str) -> str | None:
     asked, checked, resolved, split = ASK.fullmatch(text), CHECK.fullmatch(text), RESOLVE.fullmatch(text), SPLIT.fullmatch(text)
-    if asked or checked or resolved or split:
+    briefed = BRIEF.fullmatch(text)
+    if asked or checked or resolved or split or briefed:
         if core.source != "pc":
             return "Meetings are read and recorded at Main Kairu's own PC."
         from kairu.tasks.core import Step
+        if briefed:
+            return core._run_step(Step("meeting.brief", {}))[1]
         if asked:
             return core._run_step(Step("meeting.ask", {"topic": asked.group("topic").strip()}))[1]
         if checked:

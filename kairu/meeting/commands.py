@@ -16,6 +16,7 @@
   kairu meeting ask "the launch date"                     what the meetings decided about it, with the meeting and day
   kairu meeting resolve 2.1 new|old                       decide a conflict (Medium)
   kairu meeting split [N] [--hours H]                     Main Kairu splits the open actions for your Clones (team.split)
+  kairu meeting brief                                     before the next meeting: done (with proof), open, slipping, conflicts
 """
 
 import os
@@ -53,6 +54,7 @@ def add_parsers(commands) -> None:
     split = meeting.add_parser("split", help="Main Kairu splits the open actions into tasks for your Clones")
     split.add_argument("number", type=int, nargs="?", help="only this meeting's actions (else every meeting's)")
     split.add_argument("--hours", type=float, default=0, help="due this many hours from now")
+    meeting.add_parser("brief", help="before the next meeting: what got done (with proof), what's open, slipping, conflicts")
 
 
 def into_work_folder(work_folder, file: str) -> str:
@@ -166,11 +168,14 @@ def meeting(args, cfg) -> int:
         return 1 if problem else 0
     from kairu.meeting import ledger
     if which == "ledger":
-        print(ledger.told_ledger(MeetingStore(cfg.data_dir).ledger() if exists(cfg.data_dir) else []))
+        from kairu.meeting import proof
+        print(ledger.told_ledger(proof.ledger(cfg.data_dir)))
         return 0
-    if which in ("conflicts", "ask"):
+    if which in ("conflicts", "ask", "brief"):
         job = secrets.token_hex(8)
-        if which == "conflicts":
+        if which == "brief":
+            problem = _act(cfg, "meeting.brief", {"job": job})
+        elif which == "conflicts":
             problem = _act(cfg, "meeting.check", {"job": job})
         else:
             problem = _act(cfg, "meeting.ask", {"job": job, "topic": " ".join(args.topic)})
