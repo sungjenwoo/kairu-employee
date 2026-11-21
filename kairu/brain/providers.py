@@ -201,13 +201,37 @@ def gemini_url(name: str) -> str:
     return f"https://{PROVIDERS['gemini'].host}{path}"
 
 
+MEDIA_TYPES = ("audio/mp3", "audio/mpeg", "audio/wav", "audio/mp4", "audio/aac", "audio/ogg", "audio/flac", "audio/aiff",
+               "video/mp4", "video/webm", "video/quicktime", "video/mpeg")
+
+
+def media_ok(media) -> bool:
+    """One recording part for Gemini: inline_data (base64) or file_data (a file uploaded to Gemini's own Files API), of a
+    meeting's sound or video type, and nothing else."""
+    if not isinstance(media, dict) or len(media) != 1:
+        return False
+    (kind, part), = media.items()
+    if not isinstance(part, dict) or part.get("mime_type") not in MEDIA_TYPES:
+        return False
+    if kind == "inline_data":
+        return set(part) == {"mime_type", "data"} and isinstance(part["data"], str) and bool(part["data"])
+    if kind == "file_data":
+        uri = str(part.get("file_uri", ""))
+        test = os.environ.get(TEST_PROVIDERS, "")
+        return set(part) == {"mime_type", "file_uri"} and (
+            uri.startswith(f"https://{PROVIDERS['gemini'].host}/") or bool(test) and uri.startswith(test.rstrip("/") + "/"))
+    return False
+
+
 def gemini_build(key: str, messages: list[dict], model: str | None = None, transport: Transport | None = None,
                  max_tokens: int = 8192, timeout: float = TIMEOUT_SECONDS, sleep=time.sleep, picture: bytes | None = None,
-                 json_answer: bool = False) -> Reply:
+                 json_answer: bool = False, media: dict | None = None) -> Reply:
     """One Builder request to Google Gemini. Raises Backstopped, Limited, KeyRefused, Unreachable or ProviderError.
 
     picture (Kairu's eyes, kairu/tasks/eyes.py, ADR-051 proposed): a PNG of one window, in memory, put after the last words
-    you send; json_answer asks Gemini to answer with JSON only. The backstop reads every word first, as always."""
+    you send; json_answer asks Gemini to answer with JSON only. The backstop reads every word first, as always.
+    media (Meeting in, kairu/meeting/hear.py, ADR-055 proposed): one meeting recording you approved, as Gemini's own
+    inline_data or file_data part (MEDIA_TYPES only), put after the last words you send."""
     provider = PROVIDERS["gemini"]
     leaving = "\n".join(message["content"] for message in messages)
     found = privacy.secrets_in(leaving)
@@ -221,6 +245,10 @@ def gemini_build(key: str, messages: list[dict], model: str | None = None, trans
             raise ProviderError("that picture can't be sent")
         contents[-1]["parts"].append({"inline_data": {"mime_type": "image/png",
                                                       "data": base64.b64encode(picture).decode("ascii")}})
+    if media is not None:
+        if not media_ok(media) or not contents or contents[-1]["role"] != "user":
+            raise ProviderError("that recording can't be sent")
+        contents[-1]["parts"].append(media)
     body = {"contents": contents, "generationConfig": {"temperature": 0.3, "maxOutputTokens": max_tokens,
                                                        **({"responseMimeType": "application/json"} if json_answer else {})}}
     if system:

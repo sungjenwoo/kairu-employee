@@ -145,6 +145,21 @@ class Workspace:
             print(f"kairu workspace: team: {type(error).__name__}", file=sys.stderr, flush=True)
             return {"clones": [], "projects": [], "project": None}
 
+    def meetings(self, number: int | None = None) -> dict:
+        """The Meetings page (HACKATHON.md stage 1): what came out of each meeting, from data/meetings.db. Read only: reading
+        or recording a meeting is an order ("read the meeting NAME", "record the meeting"), decided by Guardian."""
+        try:
+            from kairu.meeting.conduct import live
+            from kairu.meeting.store import MeetingStore, exists
+            found = MeetingStore(self.cfg.data_dir).meetings() if exists(self.cfg.data_dir) else []
+            chosen = number or (found[0]["number"] if found else None)
+            meeting = MeetingStore(self.cfg.data_dir).meeting(chosen, transcript=True) if chosen else None
+            return {"meetings": found, "meeting": meeting, "live": live(self.cfg.data_dir),
+                    "work_folder": str(self.cfg.work_folder)}
+        except Exception as error:
+            print(f"kairu workspace: meetings: {type(error).__name__}", file=sys.stderr, flush=True)
+            return {"meetings": [], "meeting": None, "live": None, "work_folder": str(self.cfg.work_folder)}
+
     # --- an order ----------------------------------------------------------------------------------
 
     def order(self, mission: int | None, text: str, project: int | None = None) -> dict:
@@ -537,6 +552,9 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/team":
                 number = query.get("project", "")
                 return self._json(HTTPStatus.OK, workspace.team(int(number) if number.isdigit() else None))
+            if path == "/api/meetings":
+                number = query.get("meeting", "")
+                return self._json(HTTPStatus.OK, workspace.meetings(int(number) if number.isdigit() else None))
             if path == "/api/search":
                 from urllib.parse import unquote_plus
                 return self._json(HTTPStatus.OK, {"missions": workspace.store.search(unquote_plus(query.get("q", "")))})

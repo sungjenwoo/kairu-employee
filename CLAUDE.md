@@ -18,7 +18,7 @@ Clones (Main Kairu splits a project across Kairus on teammates' laptops; each Cl
 The Builder (sites, apps, slides and tests; Forge writes its own skills; Five Paths, the best of five plans): BUILDER.md.
 Kairu's eyes, the screen agent ("take control and ...": see, think, act, see again, with Gemini): BAR.md "Kairu's eyes".
 Kairu Live in the bar (LiveKit hears, Groq thinks, ElevenLabs speaks; the bar, the task core and Guardian act): VOICE.md "Kairu Live".
-The hackathon meeting agent (meeting in, decision ledger across meetings, conflict check, split to clones; not built yet, waits for the owner's GO): HACKATHON.md.
+The hackathon meeting agent (stage 1 "Meeting in" built, ADR-055 proposed; decision ledger, conflict check and split to clones next): HACKATHON.md.
 
 ## The plan (locked 28 Oct 2026)
 
@@ -258,4 +258,13 @@ The hackathon meeting agent (meeting in, decision ledger across meetings, confli
   only (never on disk or in the audit log, never a line with a secret, none with brain.talk_history: false; "forget our
   talks" ends it) and hands them to the next session; nothing else is added. "Kairu, stop" is the emergency stop. It does not start with voice.only_my_voice or voice.camera on.
   Its tests use a stand-in talking program, never LiveKit, a microphone or the network.
+- Meeting in (kairu/meeting/, HACKATHON.md, ADR-055 proposed, the owner's GO of 21 Nov 2026): meeting.read and meeting.record
+  are High: a meeting is personal, so it goes to a cloud AI only after "yes" and the PIN, to Gemini only, and meeting.read
+  reads only the work-folder file whose sha256 the card showed. A transcript line with a secret is replaced before anything is
+  kept or sent. A large recording goes through Gemini's Files API (Google's own address only) and is deleted there when the
+  transcript is back. meeting.record holds the sound in memory only, never on disk; it is the one way besides the bar's click
+  and Ctrl+Alt+V to switch the mic on (your order plus "yes" and the PIN), and a stop ends it with what it heard. Gemini's
+  answer is read strictly (kairu/meeting/read.py): an owner is never guessed, a deadline is a real date or "", a quote not in
+  the transcript is marked and never shown as evidence; nothing in it runs. data/meetings.db never leaves the PC and never
+  goes into the audit log. The workspace's Meetings page is read only, like Clones.
 - Run the checks before pushing: `python tools/check_guardian.py` (Windows: `py -3.12 tools\check_guardian.py`).
