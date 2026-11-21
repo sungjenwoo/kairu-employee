@@ -41,7 +41,8 @@ from kairu.tasks.store import TaskStore
 
 STEP_SECONDS = 30
 BUILDER_SECONDS = {"build.test": 150, "forge.test": 180,  # the Builder's longer steps (BUILDER.md); the rest take STEP_SECONDS
-                   "screen.look": 100}  # Kairu's eyes (BAR.md "Kairu's eyes"): a picture, UI Automation and Gemini
+                   "screen.look": 100,
+                   "meeting.read": 420}  # Meeting in: a long recording's upload, Gemini writing it down, and reading it  # Kairu's eyes (BAR.md "Kairu's eyes"): a picture, UI Automation and Gemini
 ANSWER_SECONDS = 150  # a question: the search, the reads and the AI, providers switching included
 POLL_SECONDS = 0.05
 CANT = "I can't do that yet."
@@ -376,6 +377,10 @@ class TaskCore:
         team = self._team(tidy(order))
         if team is not None:
             return team
+        from kairu.meeting import orders as meeting_orders
+        met = meeting_orders.handle(self, tidy(order))  # Meeting in (HACKATHON.md): read, record, end, show a meeting
+        if met is not None:
+            return met
         built = self.builder.handle(tidy(order))  # the Builder (BUILDER.md): build, forge, five paths
         if built is not None:
             return built
@@ -742,6 +747,8 @@ LABELS = {
     "screen.saved_password": "pick the browser's saved login", "details.show": "show your saved details",
     "build.write": "make the build's files in a new folder", "build.test": "run the build's tests",
     "forge.test": "try the new skill on a stand-in laptop", "forge.save": "keep the new skill", "forge.forget": "forget a skill",
+    "meeting.read": "read the meeting with Gemini", "meeting.stop": "end the meeting recording",
+    "meeting.show": "show what came out of the meeting",
 }
 
 

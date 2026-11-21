@@ -1180,3 +1180,41 @@ private), details.show (Low, read only, private).
   asks you first". No other test was changed.
 - Not yet run on Windows: every new UI Automation mode (choose, tick, at, rects, fillbox, loginbox, address, saved) and the
   wheel. The laptop test (BAR.md) is their first run.
+
+## ADR-055 — Meeting in: a meeting becomes decisions, owners, deadlines and open questions, with Gemini (21 Nov 2026, proposed)
+
+**Why (the owner, 21 Nov 2026):** the hackathon brief is an AI employee that turns meetings into finished work; the judges
+want cross-meeting memory and conflict detection, not a summariser (HACKATHON.md). Stage 1, "Meeting in", is the start of
+that pipeline. The owner's GO the same day: "go and build meeting in complete ... quick and good quality".
+
+**Decided in the build (proposed, for the owner to accept):**
+- `meeting.read` (High, private): one meeting file in the work folder (or its `meetings` folder) - a recording (mp3, wav,
+  m4a, aac, ogg, flac, mp4, webm, mov) or a transcript (Teams/Zoom/Meet .vtt, .srt, .txt, .md). The approval names the file
+  and its sha256, and the action reads only a file with exactly that hash. A recording goes to Gemini to be written down
+  (inline up to 14 MB; larger through Gemini's Files API at generativelanguage.googleapis.com only, deleted from Google as
+  soon as the transcript is back); then the transcript goes to Gemini once more, which pulls out the decisions, actions
+  (owner, deadline as a real date) and open questions as JSON.
+- Why High and not the brain's privacy filter: a meeting is personal by nature (names, who does what), so it would never pass
+  the filter as "public". CLAUDE.md already allows personal data to a cloud AI "only after yes and the PIN, for that exact
+  text and that one provider": the card is that approval, for that file's hash and Gemini alone.
+- A secret is never kept or sent: each transcript line with one (privacy.secrets_in) is replaced by a marker before
+  anything is stored or sent, and Gemini's backstop still reads every word that leaves. The sound of a recording can't be
+  scanned before it is written down; that is said on the card.
+- Gemini's answer is read strictly (kairu/meeting/read.py): JSON only, short texts, at most 40 items of each kind, a deadline
+  only as a real date within two years of the meeting (else ""), an owner never guessed (""), and every quote checked
+  against the transcript: one that isn't there is marked "not found" and never shown as evidence. Nothing in it runs.
+- What comes out is kept in data/meetings.db on this PC only (meetings, items with status open/done/replaced/dropped for
+  stage 2), never in the audit log (hashes only), never sent anywhere else.
+- `meeting.record` (High, private): the mic, in memory only, until "end the meeting" (`meeting.stop`, Low) or 60 minutes
+  (120 at most); then the same as meeting.read on that recording. **This adds a way to switch the mic on** beside the bar's
+  click and Ctrl+Alt+V: your own order plus "yes" and your PIN. No sound is ever written to disk; an emergency stop ends
+  it at once and what it heard is gone. The workspace shows "Recording 2:13" and a level bar (numbers only).
+- `meeting.show` (Low, read only) and `meeting.forget` (Medium). Orders: "read the meeting NAME", "record the meeting",
+  "end the meeting", "show the last meeting" - at Main Kairu's own PC only, like the team orders.
+- The workspace gets a Meetings page (read only, like Clones): each meeting's decisions, "who does what", actions and open
+  questions with owner and deadline chips, "no owner" / "no deadline" warnings, and each item's quote, which jumps to its
+  line in the transcript.
+
+**Next (stage 2, not built):** the decision ledger across meetings and the conflict check (decision vs earlier decision,
+deadline vs workload, owner vs owner, deadline vs dependency) read data/meetings.db; stage 3 turns confirmed actions into a
+brief for team.split.

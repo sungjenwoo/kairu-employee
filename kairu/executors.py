@@ -184,6 +184,15 @@ EXECUTORS: Mapping[str, Executor] = MappingProxyType({
     "team.note": Executor("kairu.team.inbox:note", _takes(text=str, device=str), ("data_dir",)),
     "team.check": Executor("kairu.team.conduct:check", _takes(project=float, task=float), ("data_dir",)),
     "team.offer": Executor("kairu.team.conduct:offer", _takes(clone=str, words=str), ("data_dir",)),
+    # Meeting in (HACKATHON.md stage 1, ADR-055 proposed): the brain's settings, the work folder and the data folder come from
+    # Guardian's config.yaml. meeting.read takes the file's sha256 you approved and reads only exactly that file
+    "meeting.read": Executor("kairu.meeting.conduct:read_meeting", _takes(job=str, file=str, sha=str, title=str, held=str),
+                             ("data_dir", "brain", "work_folder")),
+    "meeting.record": Executor("kairu.meeting.conduct:record", _takes(job=str, title=str, minutes=float, held=str),
+                               ("data_dir", "brain"), single=True),
+    "meeting.stop": Executor("kairu.meeting.conduct:stop_recording", _takes(job=str), ("data_dir",)),
+    "meeting.show": Executor("kairu.meeting.conduct:show", _takes(job=str, meeting=float), ("data_dir",)),
+    "meeting.forget": Executor("kairu.meeting.conduct:forget", _takes(job=str, meeting=float), ("data_dir",)),
     # The Builder (BUILDER.md, ADR-050 proposed): the brain's settings, the work folder and the data folder come from Guardian's
     # config.yaml. A draft is only kept; build.write and forge.save take the draft's number and the sha256 you were shown
     "build.draft": Executor("kairu.build.make:draft", _takes(brief=str, kind=str, ask=str, source=str),

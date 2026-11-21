@@ -70,6 +70,9 @@ LOOK_TOKENS = 1024
 LOOK_SECONDS = 45  # one look may take this long; Guardian's own limit for screen.look is longer
 BUILD_SECONDS = 120  # one Builder request may take this long; Guardian's own limit for the action is longer
 CUT_OFF = "cut off at the token limit"  # a Builder answer the provider stopped writing early (finish_reason "length")
+MEETING_ANSWER = 500_000  # a meeting's transcript (about 4 hours of talk) or its items, read strictly by kairu/meeting
+MEETING_TOKENS = 60_000  # Gemini Flash writes up to 65,536 tokens: about 4 hours of transcript
+MEETING_SECONDS = 300  # one meeting request may take this long; Guardian's own limit for meeting.read is longer
 BUILD_TOKEN_CAP = {"cloudflare": 4096, "openrouter": 8192, "gemini": 8192}  # what these free models take at most; more is refused
 KEY_REFUSED = 10 * 365 * 86400  # left alone until you add its key again
 OFFER = re.compile(r"(?<=[.!?…])\s*(?=(?:Want|Would you like|Do you want|Shall I|Should I)\b[^\n]*\?$)")
@@ -346,6 +349,20 @@ class Gateway:
                             picture=picture, json_answer=json_answer, seconds=LOOK_SECONDS)
         return Result(result.status, "L3", result.text, result.provider, result.note, (), result.seconds)
 
+    # --- Meeting in (HACKATHON.md stage 1, ADR-055 proposed) -----------------------------------------------------
+
+    def meeting(self, instructions: str, text: str, media: dict | None = None, json_answer: bool = False) -> Result:
+        """One request for a meeting you approved with "yes" and your PIN (meeting.read or meeting.record, High): Gemini writes a
+        recording down (media), or reads a transcript (text) and pulls out decisions, actions and open questions. A meeting is
+        personal by nature, so there is no privacy-filter step here: the approval is for exactly that file (its sha256) and
+        Gemini alone. Lines with a secret are left out before this (kairu/meeting/read.py), and the backstop still reads every
+        word that leaves. The brain runs nothing: the answer is read strictly by kairu/meeting/read.py and only kept."""
+        started = self.now()
+        messages = [{"role": "system", "content": instructions}, {"role": "user", "content": text}]
+        result = self._send(messages, ["gemini"], "", started, pinned=True, longest=MEETING_ANSWER, tokens=MEETING_TOKENS,
+                            raw=True, json_answer=json_answer, seconds=MEETING_SECONDS, media=media, cap=MEETING_TOKENS)
+        return Result(result.status, "L3", result.text, result.provider, result.note, (), result.seconds)
+
     # --- what the web said ---------------------------------------------------------------------------
 
     def from_the_web(self, question: str, found, source: str, route: router.Route, started: float) -> Result:
@@ -512,7 +529,8 @@ class Gateway:
 
     def _send(self, messages: list[dict], names: list[str], after: str, started: float, pinned: bool = False,
               waited: bool = False, longest: int = LONGEST_ANSWER, tokens: int | None = None, raw: bool = False,
-              picture: bytes | None = None, json_answer: bool = False, seconds: float = BUILD_SECONDS) -> Result:
+              picture: bytes | None = None, json_answer: bool = False, seconds: float = BUILD_SECONDS,
+              media: dict | None = None, cap: int | None = None) -> Result:
         """after: a note to put under the answer. longest: the most characters of answer kept (a deep report is longer).
         tokens: the most the provider may write (the Builder's are long); raw: the text as it came (code), never tidied.
         picture (Kairu's eyes, see()): a PNG of one window; it goes to Gemini only, never to another provider."""
@@ -537,6 +555,9 @@ class Gateway:
             if picture is not None and name != "gemini":
                 skipped.append(f"{provider.label}: a picture of your screen goes to Gemini only")
                 continue
+            if media is not None and name != "gemini":
+                skipped.append(f"{provider.label}: a meeting recording goes to Gemini only")
+                continue
             limit, now = self.store.limit(name), self.now()
             if limit and limit.until > now:
                 skipped.append(f"{provider.label} {limit.why}")
@@ -546,8 +567,9 @@ class Gateway:
             try:
                 if raw and name == "gemini":  # the Builder: Google's own address, several models (providers.gemini_build)
                     reply = gemini_build(stored[0], messages, models.get(name), self.transport,
-                                         max_tokens=min(tokens or BUILD_TOKENS, BUILD_TOKEN_CAP.get(name, BUILD_TOKENS)),
-                                         timeout=seconds, sleep=self.sleep, picture=picture, json_answer=json_answer)
+                                         max_tokens=min(tokens or BUILD_TOKENS, cap or BUILD_TOKEN_CAP.get(name, BUILD_TOKENS)),
+                                         timeout=seconds, sleep=self.sleep, picture=picture, json_answer=json_answer,
+                                         media=media)
                 else:
                     reply = (chat(provider, stored[0], messages, stored[1], models.get(name), self.transport,
                                   max_tokens=min(tokens, BUILD_TOKEN_CAP.get(name, tokens)), timeout=BUILD_SECONDS) if tokens
@@ -589,7 +611,7 @@ class Gateway:
                 if limit and limit.until <= self.now() + 0.5:
                     self.store.free_again(name)
             return self._send(messages, names, after, started, pinned, waited=True, longest=longest, tokens=tokens, raw=raw,
-                              picture=picture, json_answer=json_answer, seconds=seconds)
+                              picture=picture, json_answer=json_answer, seconds=seconds, media=media, cap=cap)
         if not skipped:
             return Result(NOT_SENT, "L3", "Not sent: no free AI provider is set up yet. `kairu provider add groq` sets "
                                           "one up (BRAIN.md).")

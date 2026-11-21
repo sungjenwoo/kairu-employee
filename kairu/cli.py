@@ -78,6 +78,11 @@ Clones (TEAM.md): Main Kairu splits a project across Kairus on your team's lapto
   kairu team split "BRIEF" --hours 6   Main Kairu splits the project into tasks for the Clones
   kairu team start [N] | show [N]   run it, and the team board: progress, each Clone's last words, slipping tasks
 
+Meeting in (HACKATHON.md): a meeting becomes decisions, owners, deadlines and open questions, on this PC.
+  kairu meeting add FILE [--date D]  read a recording or transcript with Gemini ("yes" and your PIN)
+  kairu meeting record | end        record from the mic, in memory only ("yes" and your PIN); end hands it to Gemini
+  kairu meeting list | show [N]     the meetings, and what came out of one
+
   kairu doctor                     Guardian's state, Kairu's memory use per program and the PC's free memory (read only)
 
 Requests, approvals, actions, resume, the PIN and re-anchoring go to the Guardian program over its
@@ -234,6 +239,8 @@ def _parser() -> argparse.ArgumentParser:
     details_forget.add_argument("key")
     details_forget.add_argument("--site", default="")
     team_commands.add_parsers(commands)
+    from kairu.meeting import commands as meeting_commands  # argparse only
+    meeting_commands.add_parsers(commands)
     workspace = commands.add_parser("workspace", help="the Kairu workspace: projects and missions in one window (WORKSPACE.md)")
     workspace.add_argument("workspace_command", nargs="?", default="start", choices=("start", "quit", "status"))
     voice = commands.add_parser("voice", help="Kairu's light voice: the offline speech model").add_subparsers(
@@ -1957,6 +1964,11 @@ def _team(args, cfg) -> int:
     return commands.team(args, cfg)
 
 
+def _meeting(args, cfg) -> int:
+    from kairu.meeting import commands
+    return commands.meeting(args, cfg)
+
+
 def _pack(args, cfg) -> int:
     from kairu.shadow import commands
     return commands.pack(args, cfg)
@@ -1966,4 +1978,4 @@ COMMANDS = {"guardian": _guardian, "status": _status, "resume": _resume, "pin": 
             "audit": _audit, "demo": _demo, "hotkey": _hotkey, "alerts": _alerts, "protect": _protect,
             "deadline": _deadline, "device": _device, "link": _link, "mission-mode": _mission_mode,
             "ask": _ask, "usage": _usage, "provider": _provider, "mission": _mission, "bar": _bar, "voice": _voice, "workspace": _workspace, "phone": _phone,
-            "shadow": _shadow, "pack": _pack, "team": _team, "doctor": _doctor, "details": _details}
+            "shadow": _shadow, "pack": _pack, "team": _team, "meeting": _meeting, "doctor": _doctor, "details": _details}

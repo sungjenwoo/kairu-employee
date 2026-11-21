@@ -482,6 +482,29 @@ actions:
     tier: Medium
     description: Offer a teammate a bigger task; it reaches their laptop with their next order and only they can accept or decline it
 
+  # Meeting in (HACKATHON.md stage 1, ADR-055 proposed): a meeting becomes decisions, owners, deadlines and open questions in
+  # data/meetings.db on this PC. A meeting is personal, so sending one to Gemini is High: "yes" and your PIN for that exact file
+  meeting.read:
+    tier: High
+    private: true
+    description: Read one meeting from your work folder with Google Gemini - a recording it writes down, or a transcript you give (txt, vtt, srt) - and pull out the decisions, owners, deadlines and open questions; exactly this file goes to Gemini only; transcript lines with a secret are left out (a recording's sound can't be checked first), and what comes out is only kept on this PC
+  meeting.record:
+    tier: High
+    private: true
+    description: Record a meeting from your microphone, in memory only (no sound is written to disk), until you say "end the meeting"; then Google Gemini writes it down and pulls out the decisions, owners, deadlines and open questions, kept on this PC
+  meeting.stop:
+    tier: Low
+    description: End the meeting recording that is running, so Gemini writes it down
+  meeting.show:
+    tier: Low
+    read_only: true
+    private: true
+    description: Say what came out of a meeting Kairu read - its decisions, actions and open questions - from data/meetings.db on this PC
+  meeting.forget:
+    tier: Medium
+    private: true
+    description: Delete one meeting from this PC - its transcript and everything that came out of it; it cannot be undone
+
   # The Builder (BUILDER.md, ADR-050 proposed): builds from a public brief, skills Forge writes, and Five Paths. The AI only
   # writes drafts; every step that changes anything is its own action below, or a known skill decided by its own tier
   build.draft:
