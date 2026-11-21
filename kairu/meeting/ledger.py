@@ -147,7 +147,10 @@ def told_ledger(ledger: list[dict]) -> str:
                          f", due {_day(item['due'])}" if item["due"] else ""))
         work = item.get("work")
         if work and item["status"] != "done":
-            extra += f", Clones {work['done']} of {work['total']} tasks done"
+            extra += f", Clones {work['done']} of {work['total']} task{'s' if work['total'] != 1 else ''} done"
+            extra += " for it" if item["kind"] == "decision" else ""
+            if work.get("check"):
+                extra += f" (check {', '.join(work['check'])}: it did nothing)"
         out.append(f"  {item['number']}. [{item['status']}] {item['kind']}: {item['what']}{extra}")
         if item["status"] == "done" and item.get("proof"):
             out.append(f"     Proof: {item['proof']}")

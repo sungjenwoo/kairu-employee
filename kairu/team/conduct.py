@@ -294,6 +294,12 @@ class Runner:
                 raise TeamError(f"task {task['number']} is for {task['clone']}, who is not a Clone any more")
             if task["state"] == BLOCKED:  # starting again tries a stuck task once more, from the order that stopped
                 self.store.set_task(self.project, task["number"], state=WAITING, last="Trying again.")
+            elif task["state"] == SENT and self.clock() - (task["sent"] or 0) > QUIET_SECONDS:
+                # no word came back for its order (found on the laptop, 21 Nov 2026: the Clone did the step, but its report
+                # was lost when the Gate didn't answer): starting again sends that same order once more. Only one silent
+                # longer than QUIET_SECONDS, so a step still waiting for that laptop's PIN (10 minutes at most) isn't sent twice
+                self.store.set_task(self.project, task["number"], state=WAITING,
+                                    last=f"No word came back for step {task['step'] + 1}; sending it again.")
         self.store.set_project(self.project, state="running", started=project["started"] or self.clock(), ended=None)
 
     def hand_out(self) -> None:
@@ -429,7 +435,9 @@ class Runner:
             self.store.set_task(self.project, task["number"], last=words)
             return
         self.store.log_result(self.project, task["number"], words)
-        if peers.failed(words):
+        order = task["orders"][task["step"]] if task["step"] < len(task["orders"]) else ""
+        closed_already = bool(re.match(r"close\b", order.strip(), re.I) and re.search(r"\bisn'?t open\b", words or "", re.I))
+        if peers.failed(words) and not closed_already:  # closing what is already closed (a re-sent close) did its job
             self.store.set_task(self.project, task["number"], state=BLOCKED, blocked_once=1, last=words or "It stopped.")
             return
         step = task["step"] + 1

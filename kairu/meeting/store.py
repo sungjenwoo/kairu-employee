@@ -289,6 +289,15 @@ class MeetingStore:
             db.commit()
             return True
 
+    def reopen(self, meeting: int, number: int) -> None:
+        """A decision an earlier version marked done from its Clone work: open again (a decision isn't finished by a task).
+        Only one with Kairu's proof on it; one the manager changed is left as it is."""
+        with closing(self.connect()) as db:
+            db.execute("UPDATE items SET status = 'open', proof = '', done_at = NULL, changed = ? WHERE meeting = ? AND "
+                       "number = ? AND kind = 'decision' AND status = 'done' AND proof != ''",
+                       (time.time(), int(meeting), int(number)))
+            db.commit()
+
     def items_of(self, kind: str = "", status: str = "") -> list[dict]:
         """Every item of this kind and status ("" : any), with its meeting's title and day, oldest meeting first."""
         with closing(self.connect()) as db:

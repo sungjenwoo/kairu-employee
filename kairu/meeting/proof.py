@@ -6,8 +6,9 @@
                                                     words; a brief with one action links every task to it
     progress(data_dir)                              read only: for each linked item, its Clone tasks, how many are done, and
                                                     its proof (who did it, the "done when" check, what was made)
-    sync(data_dir)                                  writes it back: an item whose Clone work is all done (in one project)
-                                                    becomes done in the ledger, with its proof. Called by team.run when a
+    sync(data_dir)                                  writes it back: an action whose Clone work is all done (in one project)
+                                                    becomes done in the ledger, with its proof (a decision only shows its
+                                                    work and stays open). Called by team.run when a
                                                     task finishes and by team.check
     ledger(data_dir)                                the decision ledger with that work laid over it (read only), so every
                                                     reader sees "done" at once, even before the next write-back
@@ -29,9 +30,12 @@ ID = re.compile(r"\[(?P<kind>[AD])(?P<meeting>\d{1,6})\.(?P<item>\d{1,3})\]")
 NAMED = re.compile(r"[AD]\d{1,6}\.\d{1,3}")
 MATCH = 0.34          # word overlap at or above which a task does a meeting item
 OWNER_BONUS = 0.25    # the task's Clone has the item's owner's name
-MADE = re.compile(r"\b(?:file|document|doc|note|page)\s+(?:called|named)\s+[\"']?(?P<name>[\w.-]{1,60}\.\w{1,6})", re.I)
+MADE = re.compile(r"\b(?:(?:file|document|doc|note|page)\s+(?:called|named)|save\b[^.]{0,40}?\bas)\s+[\"']?"
+                  r"(?P<name>[\w.-]{1,60}\.\w{1,6})\b", re.I)
+NOTHING = re.compile(r"so i (?:pressed|typed|clicked) nothing|nothing ran|refused|didn'?t|did not|can'?t", re.I)
 SHOWN = 6
 LONGEST_LAST = 160
+LONGEST_STEP = 90
 
 
 def ids_in(brief: str) -> dict[str, tuple[str, int, int]]:
@@ -108,7 +112,35 @@ def _made(task: dict) -> list[str]:
     return names
 
 
+def _steps(task: dict) -> list[str]:
+    """What the Clone said when each order finished (the team board's log), in order. Data, shown only."""
+    out = []
+    for entry in task.get("log") or []:
+        words = " ".join(str(entry[1] if isinstance(entry, (list, tuple)) and len(entry) > 1 else entry).split())
+        if words:
+            out.append(words[:LONGEST_STEP].rstrip(" ."))
+    return out
+
+
+def _closed_already(order: str, words: str) -> bool:
+    """A close order whose app was already closed (a re-sent close, kairu/team/conduct.py): its job is done."""
+    return bool(re.match(r"close\b", order.strip(), re.I) and re.search(r"\bisn'?t open\b", words, re.I))
+
+
+def _odd(task: dict) -> list[int]:
+    """The steps of a done task that did nothing, by its Clone's own words. One report per order: each is read against its
+    order. More reports than orders means a step stopped and was tried again (team start) until the task was done, so
+    the earlier failures are history, shown in the steps but not held against it."""
+    steps, orders = _steps(task), task.get("orders") or []
+    if len(steps) > len(orders):
+        return []
+    return [number for number, (order, words) in enumerate(zip(orders, steps), 1)
+            if NOTHING.search(words) and not _closed_already(order, words)]
+
+
 def _proof_of(task: dict) -> str:
+    """The proof of one done task: who did it and when, its "done when" check, the file it was to make, and every step as its
+    Clone reported it, with any step that did nothing called out, so you see exactly what happened."""
     said = f"{task['clone']}'s Clone did task {task['number']} '{task['title']}' (project {task['project']}"
     said += f", {_clock(task['finished'])})" if task.get("finished") else ")"
     said += f". Done when: {task['done']}"
@@ -116,10 +148,17 @@ def _proof_of(task: dict) -> str:
         said += " (checked by you)"
     made = _made(task)
     if made:
-        said += f". Made: {', '.join(made)}"
-    last = " ".join(str(task.get("last") or "").split())
-    if last:
-        said += f". It said: {last[:LONGEST_LAST].rstrip(' .')}"
+        said += f". File asked for: {', '.join(made)}"
+    steps = _steps(task)
+    if steps:
+        said += ". Steps: " + " · ".join(steps)
+        odd = [f"step {number} ({steps[number - 1]})" for number in _odd(task)]
+        if odd:
+            said += ". Check: " + "; ".join(odd)
+    else:
+        last = " ".join(str(task.get("last") or "").split())
+        if last:
+            said += f". It said: {last[:LONGEST_LAST].rstrip(' .')}"
     return said + "."
 
 
@@ -144,19 +183,23 @@ def progress(data_dir) -> dict:
         task = tasks.get(link["project"], {}).get(link["task"])
         if task is None:
             continue  # its project is gone from the board: nothing to show
-        found = out.setdefault((link["meeting"], link["item"]), {"by_project": {}, "tasks": []})
+        found = out.setdefault((link["meeting"], link["item"]), {"by_project": {}, "tasks": [], "tasks_full": []})
         found["by_project"].setdefault(link["project"], []).append(task)
+        found["tasks_full"].append(task)
         found["tasks"].append({"project": link["project"], "number": task["number"], "title": task["title"],
                                "clone": task["clone"], "state": task["state"], "how": link["how"]})
     for found in out.values():
-        complete = [held for held in found["by_project"].values() if all(task["state"] == DONE for task in held)]
+        # a task whose Clone said a step did nothing ("so I pressed nothing") is never proof: the item stays open, to check
+        found["check"] = [f"task {task['number']} step {step}" for task in found["tasks_full"] for step in _odd(task)]
+        complete = [held for held in found["by_project"].values() if all(task["state"] == DONE for task in held)
+                    and not any(_odd(task) for task in held)]
         newest = max(complete, key=lambda held: max(task["finished"] or 0 for task in held)) if complete else None
         found["total"] = len(found["tasks"])
         found["done"] = sum(task["state"] == DONE for task in found["tasks"])
         found["complete"] = newest is not None
         found["proof"] = " ".join(_proof_of(task) for task in newest) if newest else ""
         found["finished"] = max(task["finished"] or 0 for task in newest) if newest else None
-        del found["by_project"]
+        del found["by_project"], found["tasks_full"]
     return out
 
 
@@ -175,14 +218,17 @@ def split_already(data_dir) -> set[tuple[int, int]]:
 
 
 def overlay(items: list[dict], work: dict) -> list[dict]:
-    """The items with their Clone work laid over them: "work" on every linked item, and an open item whose work is complete
-    shown as done with its proof. Read only: sync() is what writes it back."""
+    """The items with their Clone work laid over them: "work" on every linked item, and an open action whose work is complete
+    shown as done with its proof. A decision only shows its work: a decision isn't finished by a task, so it stays open.
+    Read only: sync() is what writes it back."""
     out = []
     for item in items:
         found = work.get((item["meeting"], item["number"]))
         if found:
-            item = dict(item, work={key: found[key] for key in ("total", "done", "complete", "tasks")})
-            if found["complete"] and item["status"] == "open":
+            item = dict(item, work={key: found[key] for key in ("total", "done", "complete", "tasks", "check")})
+            if item["kind"] == "decision" and item["status"] == "done" and item.get("proof"):
+                item.update(status="open", proof="", done_at=None)  # marked done by an earlier version: open again
+            elif found["complete"] and item["status"] == "open" and item["kind"] == "action":
                 item.update(status="done", proof=found["proof"], done_at=found["finished"])
         out.append(item)
     return out
@@ -202,8 +248,16 @@ def sync(data_dir) -> list[tuple[int, int]]:
     if not work:
         return []
     store = MeetingStore(data_dir)
+    kinds = {(item["meeting"], item["number"]): item for item in store.ledger()}
     changed = []
     for (meeting, number), found in sorted(work.items()):
+        item = kinds.get((meeting, number))
+        if item is None:
+            continue
+        if item["kind"] == "decision":  # a decision only shows its work; one an earlier version marked done is open again
+            if item["status"] == "done" and item.get("proof"):
+                store.reopen(meeting, number)
+            continue
         if found["complete"] and store.set_done(meeting, number, found["proof"], found["finished"]):
             changed.append((meeting, number))
     return changed
@@ -268,8 +322,8 @@ def before(data_dir, today: date | None = None) -> dict:
     work = progress(data_dir)
     items = overlay(store.ledger(), work)
     known = {(item["meeting"], item["number"]): item for item in items}
-    done = sorted((item for item in items if item["status"] == "done"), key=lambda item: item.get("done_at") or 0,
-                  reverse=True)
+    done = sorted((item for item in items if item["status"] == "done" and item["kind"] == "action"),
+                  key=lambda item: item.get("done_at") or 0, reverse=True)
     still = [item for item in items if item["kind"] == "action" and item["status"] == "open"]
     still.sort(key=lambda item: (item["due"] or "9999-99-99", item["meeting"], item["number"]))
     for item in still:
@@ -308,6 +362,8 @@ def told_before(found: dict) -> str:
                 bits.append(("OVERDUE, was due " if item.get("overdue") else "due ") + _day(item["due"]))
             work = item.get("work")
             bits.append(f"Clones {work['done']} of {work['total']} tasks done" if work else "not split to the Clones yet")
+            if work and work.get("check"):
+                bits.append(f"check {', '.join(work['check'])}: it did nothing")
             out.append(f"  · {item['what'].rstrip('.')} ({', '.join(bits)}; meeting {item['meeting']})")
         if len(found["open"]) > SHOWN:
             out.append(f"  and {len(found['open']) - SHOWN} more.")

@@ -204,17 +204,19 @@ def test_a_finished_clone_task_is_written_back_to_its_action_and_decision_with_p
     fakes["Ravi"].inbox.append(f"[K{project}.1.1 finished] Opened Notepad.")
     runner.listen()
     assert item_of(tmp_path, number, 2)["status"] == "open"  # one order of two: not done yet
-    assert proof.ledger(tmp_path)[1]["work"] == {"total": 1, "done": 0, "complete": False,
-                                                 "tasks": proof.ledger(tmp_path)[1]["work"]["tasks"]}
+    work = proof.ledger(tmp_path)[1]["work"]
+    assert (work["total"], work["done"], work["complete"], work["check"]) == (1, 0, False, [])
     runner.hand_out()
     fakes["Ravi"].inbox.append(f"[K{project}.1.2 finished] Made homepage.txt in your work folder.")
     runner.listen()
     done = item_of(tmp_path, number, 2)
     assert done["status"] == "done" and done["done_at"]
     assert "Ravi's Clone did task 1 'Homepage copy'" in done["proof"]
-    assert "Done when: homepage.txt exists with a hero line" in done["proof"] and "Made: homepage.txt" in done["proof"]
-    assert "It said: Made homepage.txt" in done["proof"]
-    assert item_of(tmp_path, number, 1)["status"] == "done"  # the decision it served
+    assert "Done when: homepage.txt exists with a hero line" in done["proof"] and "File asked for: homepage.txt" in done["proof"]
+    assert "Steps: Opened Notepad · Made homepage.txt in your work folder." in done["proof"] and "Check:" not in done["proof"]
+    assert item_of(tmp_path, number, 1)["status"] == "open"  # the decision it served shows its work and stays open
+    decision = next(item for item in proof.ledger(tmp_path) if (item["meeting"], item["number"]) == (number, 1))
+    assert decision["status"] == "open" and decision["work"]["done"] == 1
     assert item_of(tmp_path, number, 3)["status"] == "open"  # Anu's research is still going
     assert any("Written back to the ledger as done" in row["words"] for row in team_store.feed(project))
     text = ledger.told_ledger(proof.ledger(tmp_path))
@@ -256,7 +258,7 @@ def test_work_done_in_one_split_counts_even_after_a_resplit(tmp_path):
     brief = f"Decided: [D{number}.1] The homepage. Tasks: [A{number}.2] Write the homepage copy.; [A{number}.3] Research."
     proof.link_project(tmp_path, again, split_tasks(number), brief)
     team_store.set_task(project, 1, state=DONE, step=2, finished=2000.0)
-    assert proof.sync(tmp_path) == [(number, 1), (number, 2)]
+    assert proof.sync(tmp_path) == [(number, 2)]  # the action; its decision only shows the work
 
 
 def test_a_done_item_is_left_out_of_the_next_split_and_of_the_rule_checks(tmp_path):
@@ -296,11 +298,10 @@ def test_the_brief_before_the_next_meeting(tmp_path):
     team_store.set_task(project, 1, state=DONE, step=2, finished=time.time(), last="Saved homepage.txt.")
     proof.sync(tmp_path)
     found = proof.before(tmp_path, today=date(2026, 11, 23))
-    assert [item["what"] for item in found["done"]] == ["Write the homepage copy.", "The homepage leads with fresh bread every morning."] \
-        or {item["what"] for item in found["done"]} == {"Write the homepage copy.", "The homepage leads with fresh bread every morning."}
+    assert [item["what"] for item in found["done"]] == ["Write the homepage copy."]  # actions only
     assert [item["what"] for item in found["open"]] == ["Research bakery websites in Hyderabad."] and found["overdue"] == 1
     text = proof.told_before(found)
-    assert text.startswith("Before your next meeting: 2 done, 1 open (1 overdue),")
+    assert text.startswith("Before your next meeting: 1 done, 1 open (1 overdue),")
     assert "✓ Write the homepage copy (Site kickoff, 19 Nov): Ravi's Clone did task 1" in text
     assert "Research bakery websites in Hyderabad (Anu, OVERDUE, was due 22 Nov, Clones 0 of 1 tasks done; meeting" in text
     assert "Open questions: Who hosts the site?" in text
@@ -460,3 +461,85 @@ def test_a_long_split_answer_comes_back_whole_from_the_gateway(tmp_path, monkeyp
     assert result.status == gateways.ANSWERED, result.text
     assert asked["max_tokens"] == team.SPLIT_TOKENS
     assert len(split.parse(result.text, [{"name": "Ravi", "share": 1.0}])) == 8
+
+
+# --- found on the laptop, 21 Nov 2026: honest proof, and decisions stay open --------------------------------------------
+
+LAPTOP_LOG = [[1, "Opened notepad."], [2, 'Typed "Homepage mockup layout: hero image, tagline, navigation" in Notepad.'],
+              [3, "Another window came to the front, so I pressed nothing."], [4, "Closed notepad."]]
+
+
+def test_the_proof_lists_every_step_and_calls_out_one_that_did_nothing():
+    task = {"clone": "Me", "number": 1, "title": "Homepage mockup", "project": 2, "finished": 0, "done": "a file exists",
+            "orders": ["open notepad", "type Homepage mockup layout in notepad",
+                       "save it in notepad as homepage_mockup.txt in notepad", "close notepad"], "log": LAPTOP_LOG}
+    said = proof._proof_of(task)
+    assert "File asked for: homepage_mockup.txt" in said
+    assert "Steps: Opened notepad · Typed" in said and "· Closed notepad." in said
+    assert "Check: step 3 (Another window came to the front, so I pressed nothing)" in said
+    good = dict(task, log=[[1, "Opened notepad."], [2, "Typed 74 characters in Notepad."], [3, "Pressed Ctrl+S in Notepad."],
+                           [4, "Closed notepad."]])
+    assert "Check:" not in proof._proof_of(good)
+
+
+def test_a_step_that_did_nothing_blocks_the_task_so_its_action_is_not_written_back(tmp_path):
+    from kairu.team.store import BLOCKED
+    _, number = site_meeting(tmp_path)
+    team_store, project, runner, fakes = run_project(tmp_path, number)
+    runner.hand_out()
+    fakes["Ravi"].inbox.append(f"[K{project}.1.1 finished] Opened notepad.")
+    runner.listen()
+    runner.hand_out()
+    fakes["Ravi"].inbox.append(f"[K{project}.1.2 finished] Another window came to the front, so I pressed nothing.")
+    runner.listen()
+    assert team_store.tasks(project)[0]["state"] == BLOCKED
+    assert item_of(tmp_path, number, 2)["status"] == "open"
+
+
+def test_a_decision_an_earlier_version_marked_done_is_open_again(tmp_path):
+    store, number = site_meeting(tmp_path)
+    team_store, project, runner, fakes = run_project(tmp_path, number)
+    team_store.set_task(project, 1, state=DONE, step=2, finished=2000.0)
+    with __import__("contextlib").closing(store.connect()) as db:  # as the first stage 5 version left it on the laptop
+        db.execute("UPDATE items SET status = 'done', proof = 'old proof', done_at = 1 WHERE meeting = ? AND number = 1",
+                   (number,))
+        db.commit()
+    assert next(i for i in proof.ledger(tmp_path) if i["number"] == 1)["status"] == "open"  # every reader at once
+    proof.sync(tmp_path)
+    decision = item_of(tmp_path, number, 1)
+    assert decision["status"] == "open" and decision["proof"] == "" and decision["done_at"] is None
+    store.set_status(number, 1, "replaced")
+    proof.sync(tmp_path)
+    assert item_of(tmp_path, number, 1)["status"] == "replaced"  # the manager's choice is never undone
+    assert "1. [replaced] decision: The homepage leads" in ledger.told_ledger(proof.ledger(tmp_path))
+
+
+def test_a_task_done_before_the_fix_with_a_step_that_did_nothing_never_makes_its_action_done(tmp_path):
+    _, number = site_meeting(tmp_path)
+    team_store, project, runner, fakes = run_project(tmp_path, number)
+    team_store.set_task(project, 1, state=DONE, step=4, finished=2000.0)
+    with __import__("contextlib").closing(team_store.connect()) as db:
+        db.execute("UPDATE tasks SET log = ?, orders = ? WHERE project = ? AND number = 1",
+                   (json.dumps(LAPTOP_LOG), json.dumps(["open notepad", "type Homepage mockup in notepad",
+                                                        "save it in notepad as homepage_mockup.txt in notepad",
+                                                        "close notepad"]), project))
+        db.commit()
+    assert proof.sync(tmp_path) == []
+    item = next(i for i in proof.ledger(tmp_path) if i["number"] == 2)
+    assert item["status"] == "open" and item["work"]["check"] == ["task 1 step 3"]
+    assert "(check task 1 step 3: it did nothing)" in ledger.told_ledger(proof.ledger(tmp_path))
+    assert "check task 1 step 3: it did nothing" in proof.told_before(proof.before(tmp_path))
+
+
+def test_a_resent_close_and_a_step_that_worked_on_retry_are_proof_not_a_check():
+    base = {"clone": "Me", "number": 5, "title": "Payment page", "project": 2, "finished": 0, "done": "a file exists",
+            "orders": ["open notepad", "type Payment page in notepad", "save it in notepad as pay.txt in notepad",
+                       "close notepad"]}
+    resent = dict(base, log=[[1, "Opened notepad."], [2, "Typed it."], [3, "Pressed Ctrl+S in Notepad."],
+                             [4, "Refused: notepad isn't open."]])
+    assert proof._odd(resent) == [] and "Check:" not in proof._proof_of(resent)
+    retried = dict(base, log=[[1, "Opened notepad."], [2, "Typed it."], [3, "Another window came to the front, so I pressed nothing."],
+                              [4, "Pressed Ctrl+S in Notepad."], [5, "Closed notepad."]])
+    assert proof._odd(retried) == []
+    failed_open = dict(base, log=[[1, "Refused: notepad isn't open."], [2, "Typed it."], [3, "Saved."], [4, "Closed notepad."]])
+    assert proof._odd(failed_open) == [1]  # only a close may find its app already closed

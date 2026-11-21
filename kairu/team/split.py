@@ -69,7 +69,8 @@ def instructions(clones: list[dict], minutes: float | None, busy: dict | None = 
         + " | ".join(EXAMPLES) + ". "
         "Only use orders like these: open or close an app, type words in an app, save in an app, make a text file with words, "
         "open a file, google something, open a website, research a question or ask a question. Every type, press, save or click "
-        "order ends with in and its app, such as 'type Hello in notepad', after an order that opens that app. Never an order with a PIN, a "
+        "order ends with in and its app, such as 'type Hello in notepad', after an order that opens that app. To open a "
+        "website, name it, such as 'open razorpay.com'; never just 'open website'. Never an order with a PIN, a "
         "password, money, a purchase, installing, deleting or a terminal.\n"
         "Answer with JSON only, no other words: "
         '{"tasks": [{"title": "...", "clone": "<a Clone\'s name>", "orders": ["...", "..."], '
@@ -95,6 +96,20 @@ def _text(value, longest: int, what: str) -> str:
 HANDS = re.compile(r"^(?:type|press|save|click)\b", re.I)
 OPENS = re.compile(r"^open (?!file\b|the file\b)([a-z0-9][a-z0-9 .+&-]{0,39})$", re.I)
 ENDS_IN = re.compile(r"\bin [a-z0-9][a-z0-9 .+&-]{0,39}$", re.I)
+
+
+VAGUE_OPEN = re.compile(r"^open (?:a |the |any |that |this )?(?:website|web ?site|site|webpage|web page|page|link|result|"
+                        r"first result|search result|it)s?$", re.I)
+
+
+def drop_vague(orders: list[str], number: int) -> list[str]:
+    """An order that opens no named thing ("open website") can't be done on any laptop (found on the laptop, 21 Nov 2026:
+    "I can't find an app called website", and the next order became "type ... in notepad in website"). Kairu only leaves
+    such an order out; a task left with no orders is no split."""
+    kept = [order for order in orders if not VAGUE_OPEN.match(order.strip(" ."))]
+    if not kept:
+        raise NoSplit(f"task {number} only opens a website without naming it")
+    return kept
 
 
 def name_apps(orders: list[str], number: int) -> list[str]:
@@ -150,7 +165,7 @@ def parse(text: str, clones: list[dict]) -> list[dict]:
         orders = task.get("orders")
         if not isinstance(orders, list) or not 1 <= len(orders) <= MOST_ORDERS:
             raise NoSplit(f"task {number} needs 1 to {MOST_ORDERS} orders")
-        orders = name_apps([_text(order, LONGEST_ORDER, "order") for order in orders], number)
+        orders = name_apps(drop_vague([_text(order, LONGEST_ORDER, "order") for order in orders], number), number)
         if any(FORBIDDEN.search(order) for order in orders):
             raise NoSplit(f"task {number} has an order with a PIN, a password or an approval in it")
         after = task.get("after", [])

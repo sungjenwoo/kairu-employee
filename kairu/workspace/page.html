@@ -1035,6 +1035,7 @@ textarea.field { min-height: 90px; resize: vertical; }
     }
     if (item.status && item.status !== "open") tags.append(el("span", "mt-tag" + (item.status === "done" ? " done" : " gone"), item.status === "done" ? "\u2713 done" : item.status));
     if (item.work && item.status !== "done") tags.append(el("span", "mt-tag work", "Clones: " + item.work.done + " of " + item.work.total + " task" + (item.work.total === 1 ? "" : "s") + " done"));
+    if (item.work && item.status !== "done" && item.work.check && item.work.check.length) tags.append(el("span", "mt-tag missing", "Check " + item.work.check.join(", ") + ": it did nothing"));
     if (item.sure === "low") tags.append(el("span", "mt-tag low", "unsure"));
     else if (item.sure === "medium") tags.append(el("span", "mt-tag", "read from context"));
     if (tags.childNodes.length) box.append(tags);
@@ -1214,7 +1215,7 @@ textarea.field { min-height: 90px; resize: vertical; }
     const row = (cls, mark, text, sub) => { const r = el("div", "row " + cls); r.append(el("span", "m", mark)); const t = el("span", "w", text); if (sub) { t.append(el("br")); t.append(el("span", "sub", sub)); } r.append(t); box.append(r); };
     for (const i of b.done.slice(0, 5)) row("ok", "\u2713", i.what + " (" + i.meeting_title + ", " + dayOf(i.held) + ")", i.proof || "marked done in the ledger");
     for (const t of b.slipping.slice(0, 5)) row("late", "!", "Task " + t.number + " “" + t.title + "” (" + t.clone + ") is " + t.why + (t.item ? " - for “" + t.item.what + "”" : ""), t.last || "");
-    for (const i of b.open.slice(0, 5)) row(i.overdue ? "late" : "open", "\u00b7", i.what + " - " + (i.owner || "nobody yet") + (i.due ? (i.overdue ? ", overdue since " : ", due ") + dayOf(i.due) : ""), i.work ? "Clones: " + i.work.done + " of " + i.work.total + " tasks done" : "not split to the Clones yet");
+    for (const i of b.open.slice(0, 5)) row(i.overdue ? "late" : "open", "\u00b7", i.what + " - " + (i.owner || "nobody yet") + (i.due ? (i.overdue ? ", overdue since " : ", due ") + dayOf(i.due) : ""), i.work ? "Clones: " + i.work.done + " of " + i.work.total + " tasks done" + (i.work.check && i.work.check.length ? " · check " + i.work.check.join(", ") + ": it did nothing" : "") : "not split to the Clones yet");
     if (!b.done.length && !b.open.length && !b.slipping.length) box.append(el("div", "muted", "Nothing open: every action agreed is done."));
     const acts = el("div", "acts");
     const brief = el("button", "btn primary", "Brief me for the next meeting"); brief.addEventListener("click", () => meetingOrder("brief me for the next meeting"));
