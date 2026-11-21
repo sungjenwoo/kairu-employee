@@ -80,8 +80,11 @@ def understand(data_dir: str, brain: dict | None, lines: list[str], held: date, 
     lines, count = read.left_out(lines)
     text = read.joined(lines)
     gateway = gateway or _gateway(data_dir, brain)
-    answer, provider = _ask(gateway, read.instructions(held, title), f"Meeting transcript:\n{text}", json_answer=True)
-    reading = read.parse(answer, text, held)
+    ledger = MeetingStore(data_dir).ledger(before=held.isoformat(), leave_out_sha=sha) if exists(data_dir) else []
+    earlier = read.earlier_lines(ledger)  # stage 2: the decision ledger, so Gemini can spot clashes with earlier meetings
+    shown = {(item["meeting"], item["number"]) for item in ledger if item.get("status", "open") == "open"}
+    answer, provider = _ask(gateway, read.instructions(held, title, earlier), f"Meeting transcript:\n{text}", json_answer=True)
+    reading = read.parse(answer, text, held, shown)
     name = title or reading["title"] or (Path(file).stem.replace("_", " ").replace("-", " ") if file else "Meeting")
     return MeetingStore(data_dir).add(name[:read.LONGEST_TITLE], held.isoformat(), file, sha, heard, lines, reading,
                                       minutes, count, provider, round(time.time() - started, 1))
@@ -260,6 +263,10 @@ def told(meeting: dict | None) -> str:
             shown = "; ".join(line_of(item) for item in kinds[kind][:SHOWN])
             more = len(kinds[kind]) - SHOWN
             out.append(f"{label}: {shown}{f'; and {more} more' if more > 0 else ''}.")
+    clashes = meeting.get("conflicts") or []
+    if clashes:
+        out.append(f"Conflicts with earlier meetings ({len(clashes)}): " + "; ".join(
+            f"{clash['kind']}: {clash['what']}" for clash in clashes[:SHOWN]) + ". Decide each with `kairu meeting resolve`.")
     if meeting.get("left_out"):
         out.append(f"({meeting['left_out']} line{'s' if meeting['left_out'] != 1 else ''} with a secret left out on this PC.)")
     out.append("All of it is on the Meetings page of the workspace (kairu workspace), with the words that show each one.")
@@ -283,6 +290,38 @@ def forget(data_dir: str, job: str, meeting: float) -> int | None:
         if not exists(data_dir) or not MeetingStore(data_dir).forget(int(meeting)):
             raise Stop(f"There's no meeting {int(meeting)}.")
         return f"Forgot meeting {int(meeting)}: its transcript and everything that came out of it."
+    return _guarded(data_dir, job, work)
+
+
+# --- stage 2: the ledger, the conflict check, "what did we decide about X?" ----------------------------------------
+
+def check(data_dir: str, job: str) -> int | None:
+    """meeting.check (Low, read only): the conflicts to decide, between meetings and by Kairu's own rules."""
+    from kairu.meeting import ledger
+    return _guarded(data_dir, job, lambda: ledger.told_check(ledger.check(data_dir)))
+
+
+def ask(data_dir: str, job: str, topic: str) -> int | None:
+    """meeting.ask (Low, read only): what the meetings decided about a topic, with the meeting, the day and the words."""
+    from kairu.meeting import ledger
+    return _guarded(data_dir, job, lambda: ledger.ask(data_dir, topic))
+
+
+def resolve(data_dir: str, job: str, meeting: float, conflict: float, keep: str) -> int | None:
+    """meeting.resolve (Medium): the manager decides one conflict. new: the earlier item becomes replaced; old: the newer item
+    is dropped. Only the ledger's statuses change; nothing runs."""
+    from kairu.meeting.store import MeetingError
+
+    def work() -> str:
+        if not exists(data_dir):
+            raise Stop("No meetings yet.")
+        try:
+            found = MeetingStore(data_dir).resolve(int(meeting), int(conflict), keep.strip().lower())
+        except MeetingError as problem:
+            raise Stop(f"Not changed: {problem}.") from None
+        if keep.strip().lower() == "new":
+            return (f"Kept the new one: {found['what']} The earlier item is now marked replaced in the ledger.")
+        return f"Kept the earlier one: the newer item is dropped. ({found['what']})"
     return _guarded(data_dir, job, work)
 
 

@@ -748,7 +748,8 @@ LABELS = {
     "build.write": "make the build's files in a new folder", "build.test": "run the build's tests",
     "forge.test": "try the new skill on a stand-in laptop", "forge.save": "keep the new skill", "forge.forget": "forget a skill",
     "meeting.read": "read the meeting with Gemini", "meeting.stop": "end the meeting recording",
-    "meeting.show": "show what came out of the meeting",
+    "meeting.show": "show what came out of the meeting", "meeting.check": "check the meetings for conflicts",
+    "meeting.ask": "look up what the meetings decided", "meeting.resolve": "decide a conflict between meetings",
 }
 
 

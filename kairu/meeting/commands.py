@@ -11,6 +11,11 @@
   kairu meeting show [N]                                  what came out of meeting N (the newest if left out)
   kairu meeting transcript N                              its transcript, as kept on this PC (secrets left out)
   kairu meeting forget N                                  delete it from this PC
+  kairu meeting ledger                                    every decision and action across meetings, with its status
+  kairu meeting conflicts                                 what clashes across meetings (Gemini's and Kairu's own checks)
+  kairu meeting ask "the launch date"                     what the meetings decided about it, with the meeting and day
+  kairu meeting resolve 2.1 new|old                       decide a conflict (Medium)
+  kairu meeting split [N] [--hours H]                     Main Kairu splits the open actions for your Clones (team.split)
 """
 
 import os
@@ -39,6 +44,15 @@ def add_parsers(commands) -> None:
     meeting.add_parser("show", help="what came out of a meeting").add_argument("number", type=int, nargs="?")
     meeting.add_parser("transcript", help="a meeting's transcript").add_argument("number", type=int)
     meeting.add_parser("forget", help="delete a meeting from this PC").add_argument("number", type=int)
+    meeting.add_parser("ledger", help="every decision and action across your meetings, with its status")
+    meeting.add_parser("conflicts", help="what clashes across your meetings, to decide")
+    meeting.add_parser("ask", help='what your meetings decided about something').add_argument("topic", nargs="+")
+    resolve = meeting.add_parser("resolve", help="decide a conflict: keep the new decision or the old one")
+    resolve.add_argument("conflict", help="MEETING.CONFLICT, as `kairu meeting conflicts` shows it, e.g. 2.1")
+    resolve.add_argument("keep", choices=("new", "old"))
+    split = meeting.add_parser("split", help="Main Kairu splits the open actions into tasks for your Clones")
+    split.add_argument("number", type=int, nargs="?", help="only this meeting's actions (else every meeting's)")
+    split.add_argument("--hours", type=float, default=0, help="due this many hours from now")
 
 
 def into_work_folder(work_folder, file: str) -> str:
@@ -150,4 +164,49 @@ def meeting(args, cfg) -> int:
         problem = _act(cfg, "meeting.forget", {"job": job, "meeting": float(args.number)})
         print(_reply(cfg, job) or problem)
         return 1 if problem else 0
+    from kairu.meeting import ledger
+    if which == "ledger":
+        print(ledger.told_ledger(MeetingStore(cfg.data_dir).ledger() if exists(cfg.data_dir) else []))
+        return 0
+    if which in ("conflicts", "ask"):
+        job = secrets.token_hex(8)
+        if which == "conflicts":
+            problem = _act(cfg, "meeting.check", {"job": job})
+        else:
+            problem = _act(cfg, "meeting.ask", {"job": job, "topic": " ".join(args.topic)})
+        print(_reply(cfg, job) or problem)
+        return 1 if problem else 0
+    if which == "resolve":
+        meeting_number, _, conflict = args.conflict.partition(".")
+        if not (meeting_number.isdigit() and conflict.isdigit()):
+            print("A conflict looks like 2.1 (meeting 2, conflict 1), as `kairu meeting conflicts` shows it.", file=sys.stderr)
+            return 2
+        job = secrets.token_hex(8)
+        problem = _act(cfg, "meeting.resolve", {"job": job, "meeting": float(meeting_number), "conflict": float(conflict),
+                                                "keep": args.keep})
+        print(_reply(cfg, job) or problem)
+        return 1 if problem else 0
+    if which == "split":
+        found = ledger.check(cfg.data_dir)
+        if found["between"]:
+            print(ledger.told_check(found))
+            print("Decide the conflicts between meetings first, then split.")
+            return 1
+        try:
+            name, brief = ledger.brief(cfg.data_dir, args.number)
+        except ValueError as problem:
+            print(problem)
+            return 1
+        import time
+        from kairu.brain.store import BrainStore
+        print(f"Brief for Main Kairu: {brief}")
+        ask = secrets.token_hex(8)
+        deadline = time.time() + args.hours * 3600 if args.hours else 0
+        problem = _act(cfg, "team.split", {"brief": brief, "name": name, "deadline": deadline, "ask": ask, "source": "pc"},
+                       seconds=150)
+        answer = BrainStore(cfg.data_dir).take_answer(ask)
+        print(answer.text if answer else problem or "No split came back; Guardian's log says why.")
+        if answer and answer.status == "answered":
+            print("Start it with `kairu team start`, and watch it on the Clones page (kairu workspace).")
+        return 0 if answer and answer.status == "answered" else 1
     return 2

@@ -28,6 +28,16 @@ END = re.compile(r"(?:end|stop|finish|wrap up)(?: the| this| our)? (?:meeting|ca
                  r"(?: recording)?", re.I)
 SHOW = re.compile(r"(?:show|open|tell me|what came out of|what (?:was|did we) decide(?:d)? in|summary of|recap)(?: me)?"
                   r"(?: the| our)? (?:(?:last|latest|previous|newest) )?(?:meeting|call)(?: (?P<number>\d{1,6}))?\??", re.I)
+# Stage 2 and 3 (HACKATHON.md): the ledger, conflicts, "what did we decide about X?", deciding a conflict, splitting
+ASK = re.compile(r"what (?:did|have) (?:we|they|the team) (?:decide|decided|agree|agreed|say|said) (?:about|on|for) "
+                 r"(?P<topic>.{2,120}?)\??", re.I)
+CHECK = re.compile(r"(?:check|look)(?: the| my| our)?(?: meetings?)? for conflicts|(?:are there |any )?conflicts(?: in| across| between)?"
+                   r"(?: the| our)?(?: meetings?)?|(?:show|open)(?: me)?(?: the)? (?:conflicts|ledger|decision ledger)"
+                   r"|what (?:clashes|conflicts)\??", re.I)
+RESOLVE = re.compile(r"keep the (?P<keep>new|old|earlier|newer)(?: one| decision)?(?: (?:for|on) conflict)? (?P<meeting>\d{1,6})"
+                     r"\.(?P<conflict>\d{1,3})", re.I)
+SPLIT = re.compile(r"(?:split|divide|turn)(?: up)? the (?:meeting|meetings)(?: (?P<number>\d{1,6}))?(?: into (?:tasks|work))?"
+                   r"(?:,? (?:in|within) (?P<hours>\d{1,3}(?:\.\d)?) hours?)?", re.I)
 SECONDS = 420  # a long recording: the upload, Gemini writing it down, and Gemini reading it
 
 
@@ -60,6 +70,21 @@ def find(work_folder, said: str) -> str:
 
 
 def handle(core, text: str) -> str | None:
+    asked, checked, resolved, split = ASK.fullmatch(text), CHECK.fullmatch(text), RESOLVE.fullmatch(text), SPLIT.fullmatch(text)
+    if asked or checked or resolved or split:
+        if core.source != "pc":
+            return "Meetings are read and recorded at Main Kairu's own PC."
+        from kairu.tasks.core import Step
+        if asked:
+            return core._run_step(Step("meeting.ask", {"topic": asked.group("topic").strip()}))[1]
+        if checked:
+            return core._run_step(Step("meeting.check", {}))[1]
+        if resolved:
+            keep = "new" if resolved.group("keep").lower() in ("new", "newer") else "old"
+            return core._run_step(Step("meeting.resolve", {"meeting": float(resolved.group("meeting")),
+                                                           "conflict": float(resolved.group("conflict")), "keep": keep}))[1]
+        return _split(core, int(split.group("number")) if split.group("number") else None,
+                      float(split.group("hours")) if split.group("hours") else 0)
     read_it, record, end, show = READ.fullmatch(text), RECORD.fullmatch(text), END.fullmatch(text), SHOW.fullmatch(text)
     if not (read_it or record or end or show):
         return None
@@ -109,3 +134,28 @@ def _record(core, title: str) -> str:
     except channel.ChannelError:
         return "Guardian is not running."
     return "Recording the meeting, in memory only. Say \"end the meeting\" when it's over, and I'll pull out the decisions."
+
+
+def _split(core, meeting: int | None, hours: float) -> str:
+    """Stage 3: a meeting's open actions become a brief for Main Kairu's split (team.split, as "split the project" does)."""
+    import time
+    from kairu.brain.store import BrainStore
+    from kairu.meeting import ledger
+    from kairu.tasks.core import SPLIT_SECONDS, _ended
+    found = ledger.check(core.cfg.data_dir)
+    if found["between"]:
+        return (f"First decide the {len(found['between'])} conflict{'s' if len(found['between']) != 1 else ''} between "
+                "meetings (say: show the conflicts), then split the meeting.")
+    try:
+        name, brief = ledger.brief(core.cfg.data_dir, meeting)
+    except ValueError as problem:
+        return str(problem)
+    core._tell({"kind": "thinking"})
+    ask = secrets.token_hex(8)
+    details = {"brief": brief, "name": name, "deadline": time.time() + hours * 3600 if hours else 0, "ask": ask,
+               "source": core.source}
+    outcome = core._run(Action("team.split", details), None, SPLIT_SECONDS)
+    if outcome != "finished":
+        return _ended("The split", outcome)
+    answer = BrainStore(core.cfg.data_dir).take_answer(ask)
+    return answer.text if answer else "No split came back; Guardian's log says why."

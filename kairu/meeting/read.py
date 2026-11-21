@@ -170,7 +170,46 @@ HEAR = (
     "Answer with the transcript lines only: no title, notes or summary.")
 
 
-def instructions(held: date, title: str = "") -> str:
+EARLIER_SHOWN = 60  # earlier decisions and actions Gemini is shown to check against (the newest open ones)
+CONFLICT_KINDS = ("decision", "deadline", "owner", "workload", "dependency")
+
+
+def earlier_lines(ledger: list[dict]) -> list[str]:
+    """The decision ledger as Gemini sees it (stage 2): one line per earlier open decision or action, each with its id
+    E<meeting>.<item>. Only what came out of your own earlier meetings, already secret-free."""
+    shown = [item for item in ledger if item.get("status", "open") == "open"][-EARLIER_SHOWN:]
+    out = []
+    for item in shown:
+        extra = "".join((f"; owner {item['owner']}" if item.get("owner") else "",
+                         f"; due {item['due']}" if item.get("due") else ""))
+        out.append(f"[E{item['meeting']}.{item['number']}] meeting {item['meeting']} ({item['held']}), {item['kind']}: "
+                   f"{item['what']}{extra}")
+    return out
+
+
+def instructions(held: date, title: str = "", earlier: list[str] | None = None) -> str:
+    return _instructions(held, title) + (_conflict_rules(earlier) if earlier else "")
+
+
+def _conflict_rules(earlier: list[str]) -> str:
+    return (
+        "\n\nCross-meeting memory: these are the team's open decisions and actions from EARLIER meetings, each with an id:\n"
+        + "\n".join(earlier) +
+        "\nAlso add to the JSON a \"conflicts\" list: each place where THIS meeting clashes with an earlier item. Kinds:\n"
+        "- decision: this meeting decides something that goes against an earlier decision (a dropped thing is back, a choice "
+        "is changed).\n"
+        "- deadline: a date for the same work moves, or a deadline is now before the work it depends on.\n"
+        "- owner: the same work is given to a different person than before, or two people now hold the same task.\n"
+        "- workload: someone is said to be overloaded, or gets more work while already holding earlier open actions.\n"
+        "- dependency: a task is due before a task it waits on.\n"
+        'Each conflict: {"kind": "decision", "what": "one plain sentence naming both sides and their dates", '
+        '"about": "decision 1" (which item of THIS answer it is about, as kind and number in your lists, or ""), '
+        '"earlier": "E1.3" (the earlier id it clashes with, or ""), "quote": "the exact words from THIS transcript", "at": ""}.\n'
+        f"At most {MOST_ITEMS} conflicts. Only real clashes with the earlier items or inside this meeting; never invent one. "
+        "Use an empty list when there are none.")
+
+
+def _instructions(held: date, title: str = "") -> str:
     day = held.strftime("%A %d %B %Y")
     named = f' The meeting is called "{title}".' if title else ""
     return (
@@ -261,7 +300,7 @@ def _items(data: dict, kind: str, transcript: str, held: date, people: set[str])
         quote = _text(item.get("quote", ""), LONGEST_QUOTE, f"{kind} {number}'s quote", empty=True)
         at = str(item.get("at") or "").strip().strip("[]")
         sure = str(item.get("sure") or "medium").lower()
-        entry = {"kind": kind[:-1], "what": what, "owner": owner,
+        entry = {"kind": kind[:-1], "source": number, "what": what, "owner": owner,
                  "due": due_date(item.get("due"), held) if kind != "questions" else "",
                  "due_said": _text(item.get("due_said", ""), 80, f"{kind} {number}'s due_said", empty=True),
                  "replaces": _text(item.get("replaces", ""), LONGEST_ITEM, f"{kind} {number}'s replaces", empty=True),
@@ -275,7 +314,7 @@ def _items(data: dict, kind: str, transcript: str, held: date, people: set[str])
     return out
 
 
-def parse(text: str, transcript: str, held: date) -> dict:
+def parse(text: str, transcript: str, held: date, earlier_ids: set[tuple[int, int]] | None = None) -> dict:
     """{"title", "summary", "people", "items": [...]} or NoReading. Each item: kind (decision, action, question), what,
     owner, due (YYYY-MM-DD or ""), due_said, replaces, quote, at, sure, heard (the quote is really in the transcript) and
     owner_heard (the owner's name is in the transcript)."""
@@ -300,8 +339,48 @@ def parse(text: str, transcript: str, held: date) -> dict:
     summary = _text(data.get("summary", ""), LONGEST_SUMMARY, "the summary", empty=True)
     if privacy.secrets_in(summary):
         summary = ""
+    found_conflicts = conflicts_of(data, items, transcript, earlier_ids or set())
+    for item in items:
+        item.pop("source", None)
     return {"title": _text(data.get("title", ""), LONGEST_TITLE, "the title", empty=True), "summary": summary,
-            "people": people, "items": items}
+            "people": people, "items": items, "conflicts": found_conflicts}
+
+
+ABOUT = re.compile(r"(decision|action|question)s?\s*#?\s*(\d{1,3})", re.I)
+EARLIER_ID = re.compile(r"E?(\d{1,6})\.(\d{1,4})", re.I)
+
+
+def conflicts_of(data: dict, items: list[dict], transcript: str, earlier_ids: set[tuple[int, int]]) -> list[dict]:
+    """Gemini's conflicts, read strictly: a kind Kairu knows, an earlier id that was really shown (else none), the item it is
+    about mapped to this meeting's item number, and the quote checked against the transcript. A bad entry is left out."""
+    found = data.get("conflicts") or []
+    if not isinstance(found, list):
+        return []
+    out = []
+    for entry in found[:MOST_ITEMS]:
+        if not isinstance(entry, dict):
+            continue
+        kind = str(entry.get("kind") or "").lower().strip()
+        try:
+            what = _text(entry.get("what"), LONGEST_ITEM, "a conflict")
+            quote = _text(entry.get("quote", ""), LONGEST_QUOTE, "a conflict's quote", empty=True)
+        except NoReading:
+            continue
+        if kind not in CONFLICT_KINDS or privacy.secrets_in(f"{what} {quote}"):
+            continue
+        item = 0
+        about = ABOUT.search(str(entry.get("about") or ""))
+        if about:
+            for number, candidate in enumerate(items, 1):
+                if candidate["kind"] == about.group(1).lower() and candidate.get("source") == int(about.group(2)):
+                    item = number
+        earlier_meeting = earlier_item = 0
+        said = EARLIER_ID.search(str(entry.get("earlier") or ""))
+        if said and (int(said.group(1)), int(said.group(2))) in earlier_ids:
+            earlier_meeting, earlier_item = int(said.group(1)), int(said.group(2))
+        out.append({"kind": kind, "what": what, "item": item, "earlier_meeting": earlier_meeting,
+                    "earlier_item": earlier_item, "quote": quote, "heard": heard(quote, transcript) if quote else False})
+    return out
 
 
 def transcript_answer(text: str) -> list[str]:
