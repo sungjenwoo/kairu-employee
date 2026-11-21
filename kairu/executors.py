@@ -193,6 +193,12 @@ EXECUTORS: Mapping[str, Executor] = MappingProxyType({
     "meeting.stop": Executor("kairu.meeting.conduct:stop_recording", _takes(job=str), ("data_dir",)),
     "meeting.show": Executor("kairu.meeting.conduct:show", _takes(job=str, meeting=float), ("data_dir",)),
     "meeting.forget": Executor("kairu.meeting.conduct:forget", _takes(job=str, meeting=float), ("data_dir",)),
+    # Stage 2 (HACKATHON.md): the conflict check and "what did we decide about X?" read data/meetings.db only; resolve changes
+    # only the ledger's statuses
+    "meeting.check": Executor("kairu.meeting.conduct:check", _takes(job=str), ("data_dir",)),
+    "meeting.ask": Executor("kairu.meeting.conduct:ask", _takes(job=str, topic=str), ("data_dir",)),
+    "meeting.resolve": Executor("kairu.meeting.conduct:resolve", _takes(job=str, meeting=float, conflict=float, keep=str),
+                                ("data_dir",)),
     # The Builder (BUILDER.md, ADR-050 proposed): the brain's settings, the work folder and the data folder come from Guardian's
     # config.yaml. A draft is only kept; build.write and forge.save take the draft's number and the sha256 you were shown
     "build.draft": Executor("kairu.build.make:draft", _takes(brief=str, kind=str, ask=str, source=str),

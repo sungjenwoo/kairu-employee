@@ -3,8 +3,26 @@
 **Brief:** build an AI employee that converts meetings into actual completed work. The judges stress
 **cross-meeting memory** and **conflict detection**; a simple meeting summarizer is not enough.
 
-**Status (21 Nov 2026):** stage 1, **Meeting in, is built** (ADR-055, proposed; the owner's GO of 21 Nov 2026), on the
-branch `meeting-in`; laptop test pending. Stages 2 to 5 are next.
+**Status (21 Nov 2026):** stage 1, **Meeting in, is built** and laptop-tested (ADR-055, proposed). **Stage 2 (memory and
+conflicts) and stage 3 (split to Clones) are built** on top of it (branch `meeting-ledger`), laptop test pending. Stage 5
+(proof written back to the decision) is next.
+
+## Stage 2 and 3: memory, conflicts, split (built)
+
+| Order (bar, workspace) | PowerShell | What happens |
+| --- | --- | --- |
+| `read the meeting weekly sync` | `kairu meeting add FILE --date D` | As stage 1, and Gemini is also shown the earlier open decisions and actions (the ledger, ids `E1.2`) and names each clash: a dropped thing back, a moved date, a changed owner, someone overloaded. Kept, read strictly (an id never shown is dropped, quotes checked). |
+| `show the conflicts` / `check for conflicts` | `kairu meeting conflicts` | Gemini's open conflicts between meetings, plus Kairu's own checks: no owner, two owners for the same work, an owner with more than 3 open actions this week or over 240 busy minutes on the team board, a task due before what it waits on. (`meeting.check`, Low) |
+| `what did we decide about the launch?` | `kairu meeting ask "the launch"` | The newest decision about it, with the meeting, the day, its status and the words; then what came before. (`meeting.ask`, Low) |
+| `keep the new one 2.1` / `keep the old one 2.1` | `kairu meeting resolve 2.1 new` | The manager decides: new marks the earlier item replaced; old marks the newer item dropped. (`meeting.resolve`, Medium) |
+| `split the meeting [N] [in 2 hours]` | `kairu meeting split [N] --hours 2` | Refused while conflicts between meetings are open. Then the open actions (with owners and dates) become a brief for `team.split`, as "split the project" does; `kairu team start` runs it. |
+| | `kairu meeting ledger` | Every decision and action across meetings, with its status (open, done, replaced, dropped). |
+
+The Meetings page shows "Conflicts to decide" (red: between meetings, with the earlier words and day, and Keep new / Keep the
+earlier one buttons; amber: Kairu's own checks), each item's status, and a "Split this meeting to the Clones" button.
+
+Code: `kairu/meeting/ledger.py` (rules, ask, brief), `store.py` (conflicts table, ledger, resolve), `read.py` (ledger in the
+prompt, conflicts read strictly), tests in `tests_kairu/test_meeting_ledger.py`.
 
 ## Stage 1: Meeting in (built)
 

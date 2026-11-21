@@ -39,6 +39,7 @@ def test_your_words_are_kept_as_a_hash_wherever_they_are_details():
                                                                        "terminal.run", "terminal.run_work", "terminal.run_any",  # PC5
                                                                        "apps.install", "apps.uninstall",
                                                                        "meeting.read", "meeting.record", "meeting.show", "meeting.forget",  # Meeting in (ADR-055)
+                                                                           "meeting.check", "meeting.ask", "meeting.resolve",  # stage 2
                                                                        "build.draft", "build.write", "build.test",  # the Builder
                                                                        "forge.draft", "forge.test", "forge.save", "forge.forget",
                                                                        "paths.draft",

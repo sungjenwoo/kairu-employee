@@ -504,6 +504,22 @@ actions:
     tier: Medium
     private: true
     description: Delete one meeting from this PC - its transcript and everything that came out of it; it cannot be undone
+  # Stage 2 (HACKATHON.md): the decision ledger across meetings and the conflict check. Reading is Low; deciding a conflict
+  # changes the ledger, so it is Medium. Splitting a meeting's actions to the Clones is team.split (above), as always
+  meeting.check:
+    tier: Low
+    read_only: true
+    private: true
+    description: Say the conflicts across your meetings - a decision that goes against an earlier one, a moved deadline, a task with no owner or two owners, someone overloaded, a task due before what it waits on - from data/meetings.db on this PC
+  meeting.ask:
+    tier: Low
+    read_only: true
+    private: true
+    description: Say what your meetings decided about a topic, with the meeting, its day and the words that show it, from data/meetings.db on this PC
+  meeting.resolve:
+    tier: Medium
+    private: true
+    description: Decide one conflict between meetings - keep the new decision (the earlier one is marked replaced) or the earlier one (the new one is marked dropped); only the ledger on this PC changes
 
   # The Builder (BUILDER.md, ADR-050 proposed): builds from a public brief, skills Forge writes, and Five Paths. The AI only
   # writes drafts; every step that changes anything is its own action below, or a known skill decided by its own tier

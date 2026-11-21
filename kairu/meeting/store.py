@@ -58,7 +58,23 @@ CREATE TABLE IF NOT EXISTS items (
     changed    REAL,
     PRIMARY KEY (meeting, number)
 );
+CREATE TABLE IF NOT EXISTS conflicts (
+    meeting    INTEGER NOT NULL,       -- the meeting that raised it (the newer one)
+    number     INTEGER NOT NULL,       -- 1, 2, ... within that meeting
+    kind       TEXT NOT NULL,          -- decision, deadline, owner, workload, dependency
+    what       TEXT NOT NULL,          -- the conflict in one plain sentence
+    item       INTEGER NOT NULL DEFAULT 0,      -- the newer meeting's item it is about (0: none)
+    earlier_meeting INTEGER NOT NULL DEFAULT 0, -- the earlier meeting's item it clashes with (0: none)
+    earlier_item    INTEGER NOT NULL DEFAULT 0,
+    quote      TEXT NOT NULL DEFAULT '',        -- the newer meeting's words
+    heard      INTEGER NOT NULL DEFAULT 0,      -- 1: that quote is really in the newer transcript
+    status     TEXT NOT NULL DEFAULT 'open',    -- open, kept-new, kept-old
+    PRIMARY KEY (meeting, number)
+);
 """
+
+CONFLICT_KINDS = ("decision", "deadline", "owner", "workload", "dependency")
+CONFLICT_STATUSES = ("open", "kept-new", "kept-old")
 
 ITEM_FIELDS = ("kind", "what", "owner", "due", "due_said", "replaces", "quote", "at", "sure", "heard", "owner_heard")
 
@@ -102,6 +118,12 @@ class MeetingStore:
                            f"{', '.join('?' for _ in ITEM_FIELDS)})",
                            (number, index, *[int(item[name]) if name in ("heard", "owner_heard") else item.get(name, "")
                                              for name in ITEM_FIELDS]))
+            for index, found in enumerate(reading.get("conflicts", []), 1):
+                db.execute("INSERT INTO conflicts (meeting, number, kind, what, item, earlier_meeting, earlier_item, quote, "
+                           "heard) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                           (number, index, found["kind"], found["what"], int(found.get("item", 0)),
+                            int(found.get("earlier_meeting", 0)), int(found.get("earlier_item", 0)), found.get("quote", ""),
+                            int(bool(found.get("heard")))))
             db.commit()
         return int(number)
 
@@ -114,6 +136,19 @@ class MeetingStore:
             found["transcript"] = lines
         found["items"] = [dict(item, heard=bool(item["heard"]), owner_heard=bool(item["owner_heard"])) for item in
                           db.execute("SELECT * FROM items WHERE meeting = ? ORDER BY number", (row["number"],))]
+        found["conflicts"] = [self._conflict(dict(item), db) for item in
+                              db.execute("SELECT * FROM conflicts WHERE meeting = ? ORDER BY number", (row["number"],))]
+        return found
+
+    def _conflict(self, found: dict, db) -> dict:
+        """A conflict with the earlier item it clashes with (its words, meeting title and day), when there is one."""
+        found["heard"] = bool(found["heard"])
+        found["earlier"] = None
+        if found["earlier_meeting"]:
+            row = db.execute("SELECT i.what, i.quote, i.owner, i.due, i.status, m.title, m.held FROM items i JOIN meetings m "
+                             "ON m.number = i.meeting WHERE i.meeting = ? AND i.number = ?",
+                             (found["earlier_meeting"], found["earlier_item"])).fetchone()
+            found["earlier"] = dict(row) if row else None
         return found
 
     def meeting(self, number: int, transcript: bool = False) -> dict | None:
@@ -156,8 +191,55 @@ class MeetingStore:
         if not changed:
             raise MeetingError(f"meeting {meeting} has no item {number}")
 
+    def ledger(self, before: str = "", leave_out_sha: str = "") -> list[dict]:
+        """Every decision and action across meetings (stage 2, the decision ledger), oldest meeting first, each with its
+        meeting's number, title and day. before (YYYY-MM-DD): only meetings held on or before that day."""
+        with closing(self.connect()) as db:
+            rows = db.execute(
+                "SELECT i.*, m.title AS meeting_title, m.held AS held FROM items i JOIN meetings m ON m.number = i.meeting "
+                "WHERE i.kind IN ('decision', 'action') AND (? = '' OR m.held <= ?) AND (? = '' OR m.sha256 != ?) "
+                "ORDER BY m.held, m.number, i.number", (before, before, leave_out_sha, leave_out_sha)).fetchall()
+            return [dict(row, heard=bool(row["heard"]), owner_heard=bool(row["owner_heard"])) for row in rows]
+
+    def conflicts(self, status: str = "") -> list[dict]:
+        """Every conflict a meeting raised, newest meeting first (status "" : all)."""
+        with closing(self.connect()) as db:
+            rows = db.execute("SELECT c.*, m.title AS meeting_title, m.held AS held FROM conflicts c JOIN meetings m "
+                              "ON m.number = c.meeting WHERE (? = '' OR c.status = ?) ORDER BY m.held DESC, c.meeting DESC, "
+                              "c.number", (status, status)).fetchall()
+            out = []
+            for row in rows:
+                found = self._conflict(dict(row), db)
+                item = db.execute("SELECT what, owner, due FROM items WHERE meeting = ? AND number = ?",
+                                  (row["meeting"], row["item"])).fetchone() if row["item"] else None
+                found["newer"] = dict(item) if item else None
+                out.append(found)
+            return out
+
+    def resolve(self, meeting: int, number: int, keep: str) -> dict:
+        """The manager decides a conflict: keep the new one (the earlier item becomes replaced) or the old one (the newer item
+        is dropped). Returns the conflict."""
+        if keep not in ("new", "old"):
+            raise MeetingError("keep the new one or the old one")
+        with closing(self.connect()) as db:
+            row = db.execute("SELECT * FROM conflicts WHERE meeting = ? AND number = ?", (int(meeting), int(number))).fetchone()
+            if not row:
+                raise MeetingError(f"meeting {meeting} has no conflict {number}")
+            now = time.time()
+            if keep == "new" and row["earlier_meeting"]:
+                db.execute("UPDATE items SET status = 'replaced', changed = ? WHERE meeting = ? AND number = ?",
+                           (now, row["earlier_meeting"], row["earlier_item"]))
+            if keep == "old" and row["item"]:
+                db.execute("UPDATE items SET status = 'dropped', changed = ? WHERE meeting = ? AND number = ?",
+                           (now, row["meeting"], row["item"]))
+            db.execute("UPDATE conflicts SET status = ? WHERE meeting = ? AND number = ?",
+                       (f"kept-{keep}", int(meeting), int(number)))
+            db.commit()
+            return dict(row)
+
     def forget(self, number: int) -> bool:
         with closing(self.connect()) as db:
+            db.execute("DELETE FROM conflicts WHERE meeting = ?", (int(number),))
             db.execute("DELETE FROM items WHERE meeting = ?", (int(number),))
             gone = db.execute("DELETE FROM meetings WHERE number = ?", (int(number),)).rowcount
             db.commit()

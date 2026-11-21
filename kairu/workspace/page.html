@@ -212,6 +212,14 @@ textarea.field { min-height: 90px; resize: vertical; }
 .sev.high, .sev.critical { background: var(--red-soft); color: var(--red); }
 .sev.medium { background: var(--amber-soft); color: var(--amber); }
 /* --- Meetings (HACKATHON.md stage 1) --- */
+.mt-clash { border: 1px solid var(--red); background: var(--red-soft); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; }
+.mt-clash .k { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--red); font-weight: 700; }
+.mt-clash .what { font-weight: 600; margin: 2px 0 6px; }
+.mt-clash .was { color: var(--muted); font-size: 13px; margin-top: 4px; }
+.mt-clash .acts { display: flex; gap: 8px; margin-top: 8px; }
+.mt-rule { border: 1px solid var(--amber); background: var(--amber-soft); border-radius: 12px; padding: 10px 14px; margin-bottom: 8px; }
+.mt-rule .k { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--amber); font-weight: 700; }
+.mt-tag.gone { text-decoration: line-through; opacity: .75; }
 .mt-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; border: 1px solid var(--border); background: var(--surface); border-radius: 14px; padding: 12px 14px; }
 .mt-bar input { flex: 1; min-width: 220px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--bg); }
 .mt-rec { display: inline-flex; align-items: center; gap: 8px; }
@@ -1011,6 +1019,7 @@ textarea.field { min-height: 90px; resize: vertical; }
       else if (item.due_said) tags.append(el("span", "mt-tag missing", "\u{1F4C5} “" + item.due_said + "” (no date)"));
       else if (item.kind === "action") tags.append(el("span", "mt-tag missing", "No deadline"));
     }
+    if (item.status && item.status !== "open") tags.append(el("span", "mt-tag" + (item.status === "done" ? " owner" : " gone"), item.status));
     if (item.sure === "low") tags.append(el("span", "mt-tag low", "unsure"));
     else if (item.sure === "medium") tags.append(el("span", "mt-tag", "read from context"));
     if (tags.childNodes.length) box.append(tags);
@@ -1100,6 +1109,26 @@ textarea.field { min-height: 90px; resize: vertical; }
     if (undated) stat(undated, "no deadline", true);
     if (unheard) stat(unheard, "quote not found", true);
     main.append(stats);
+    // stage 2: what clashes with earlier meetings (Gemini, read strictly) and Kairu's own checks across every meeting
+    const clashes = m.conflicts || [];
+    const rules = (data.check && data.check.rules) || [];
+    if (clashes.length || rules.length) {
+      main.append(el("div", "section-h", "Conflicts to decide (" + (clashes.filter(c => c.status === "open").length + rules.length) + ")"));
+      for (const c of clashes) {
+        const box = el("div", "mt-clash");
+        box.append(el("div", "k", c.kind + (c.status !== "open" ? " · " + c.status : "")), el("div", "what", c.what));
+        if (c.earlier) box.append(el("div", "was", "Earlier: “" + c.earlier.what + "” (" + c.earlier.title + ", " + dayOf(c.earlier.held) + ")" + (c.earlier.quote ? " - they said: “" + c.earlier.quote + "”" : "")));
+        if (c.quote) box.append(el("div", "was", "Now: “" + c.quote + "”" + (c.heard ? "" : " (check: not found in the transcript)")));
+        if (c.status === "open") {
+          const acts = el("div", "acts");
+          const keepNew = el("button", "btn primary", "Keep the new one"); keepNew.addEventListener("click", () => meetingOrder("keep the new one " + c.meeting + "." + c.number));
+          const keepOld = el("button", "btn", "Keep the earlier one"); keepOld.addEventListener("click", () => meetingOrder("keep the old one " + c.meeting + "." + c.number));
+          acts.append(keepNew, keepOld); box.append(acts);
+        }
+        main.append(box);
+      }
+      for (const r of rules) { const box = el("div", "mt-rule"); box.append(el("div", "k", r.kind), el("div", "", r.what)); main.append(box); }
+    }
     // the transcript, built first so the quotes can jump to it
     const transcript = el("div", "mt-transcript");
     const lines = [];
@@ -1146,11 +1175,15 @@ textarea.field { min-height: 90px; resize: vertical; }
     section("Actions", kinds.action, "Nobody took on any work.");
     section("Open questions", kinds.question, "Nothing was left open.");
     main.append(details);
-    main.append(el("p", "muted", "Next: the decision ledger checks these against earlier meetings, and Main Kairu splits the actions across the Clones."));
+    const go = el("div", "mt-bar"); go.style.marginTop = "14px";
+    const split = el("button", "btn primary", "Split this meeting to the Clones");
+    split.addEventListener("click", () => meetingOrder("split the meeting " + m.number));
+    go.append(split, el("span", "muted", "Main Kairu turns the open actions into tasks for each Clone (decide the conflicts first). Or say: “what did we decide about the launch?”"));
+    main.append(go);
     $("scroll").scrollTop = keepScroll;
     meetingTimer(data.live);
   }
-  function meetingSig(data) { return JSON.stringify([data.meetings.map(x => [x.number, x.decisions, x.actions, x.questions]), !!data.live]); }
+  function meetingSig(data) { return JSON.stringify([data.meetings.map(x => [x.number, x.decisions, x.actions, x.questions]), !!data.live, data.meeting && (data.meeting.conflicts || []).map(c => c.status), data.meeting && data.meeting.items.map(i => i.status), data.check && data.check.rules.length]); }
   function meetingTimer(live) {  // a recording ticks every second; otherwise the page changes only when a meeting comes in
     clearTimeout(meetingTimer.t);
     meetingTimer.t = setTimeout(async () => {

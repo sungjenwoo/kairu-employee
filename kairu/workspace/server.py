@@ -154,8 +154,9 @@ class Workspace:
             found = MeetingStore(self.cfg.data_dir).meetings() if exists(self.cfg.data_dir) else []
             chosen = number or (found[0]["number"] if found else None)
             meeting = MeetingStore(self.cfg.data_dir).meeting(chosen, transcript=True) if chosen else None
+            from kairu.meeting import ledger
             return {"meetings": found, "meeting": meeting, "live": live(self.cfg.data_dir),
-                    "work_folder": str(self.cfg.work_folder)}
+                    "work_folder": str(self.cfg.work_folder), "check": ledger.check(self.cfg.data_dir)}
         except Exception as error:
             print(f"kairu workspace: meetings: {type(error).__name__}", file=sys.stderr, flush=True)
             return {"meetings": [], "meeting": None, "live": None, "work_folder": str(self.cfg.work_folder)}
